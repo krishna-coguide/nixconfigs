@@ -1,4 +1,9 @@
-{ inputs, modulesPath, ... }:
+{
+  config,
+  inputs,
+  modulesPath,
+  ...
+}:
 
 {
   imports = [
@@ -13,6 +18,8 @@
 
   nix = {
     channel.enable = false;
+    # Keep non-login environments on the same pin when NIX_PATH is unset.
+    settings.nix-path = config.nix.nixPath;
     settings.experimental-features = [
       "nix-command"
       "flakes"

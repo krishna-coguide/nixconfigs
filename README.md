@@ -55,7 +55,7 @@ nix --extra-experimental-features 'nix-command flakes' build \
 
 Then review/apply the resulting closure as above. The configuration creates `dev`, sets permissions and deploys its files. **No separate Neovim clone, copy, useradd, chown or global Git-config recipe is required.**
 
-This host build does not use a mutable channel. NixOS's native flake integration also pins the `nixpkgs` registry entry and `<nixpkgs>` lookup to the system input. Dev-environment templates/composition remain deferred; there is no flake framework here.
+This host build does not use a mutable channel. NixOS's native flake integration pins the `nixpkgs` registry entry and login-shell `<nixpkgs>` lookup to the system input; the global `nix-path` setting keeps the same pin when `NIX_PATH` is unset. Old root channel profiles are retained for recovery, not used as build inputs. Dev-environment templates/composition remain deferred; there is no flake framework here.
 
 ## Neovim: import, do not rewrite
 
