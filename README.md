@@ -66,6 +66,12 @@ Home Manager deploys its files under `~/.config/nvim`, with the **Lua, AstroNvim
 
 **Reproducibility boundary:** Nix locks the host inputs and dotfile source, and reproduces their deployment. The existing Lua still bootstraps Lazy and manages plugin/Mason downloads at runtime. The supplied Lazy lock records plugin revisions, but it is writable and Mason's tool versions are not pinned by this Nix config. This is not a claim that every runtime download/cache is a Nix-reproducible build. Changing that policy requires a separate agreement; do not silently replace the user's plugin managers.
 
+## Validation and commits
+
+The initial deployment was tested with an empty disposable home: all upstream files were reproduced byte-for-byte, the Lazy lock remained writable across repeated activation, and the migration preserved local data and refused to overwrite an existing backup. The real plugin bootstrap is a separate runtime test, not covered by these file-deployment checks.
+
+Make focused changes, format/evaluate them, and commit regularly. Build and activate a reviewed commit rather than accumulating uncommitted setup. `system.configurationRevision` records the source revision in the system generation. Do not put human identity guesses in Git settings or push to an unapproved remote.
+
 ## Updates and safety
 
 - To change a pinned source, update its revision in `flake.nix`, regenerate `flake.lock` with `nix flake lock`, review the diff, then check/build before switching. No unattended updates.
