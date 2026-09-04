@@ -39,9 +39,12 @@ New source files must be added to Git for flakes to see them. Keep `flake.lock` 
 Review and activate exactly the built closure:
 
 ```sh
-sudo nixos-rebuild dry-activate --store-path "$(readlink -f result)"
-sudo nixos-rebuild switch --store-path "$(readlink -f result)"
+built=$(readlink -f result)
+sudo "$built/sw/bin/nixos-rebuild" dry-activate --no-reexec --store-path "$built"
+sudo "$built/sw/bin/nixos-rebuild" switch --no-reexec --store-path "$built"
 ```
+
+Use the rebuild tool from that closure with `--no-reexec`: otherwise the bootstrap tool can try to rebuild itself through the old channel even when `--store-path` is supplied. Capturing `built` also keeps review and activation on the same immutable result.
 
 For initial deployment on a compatible NixOS EC2 base where flakes are not enabled yet, check out this repo and run the build as an existing administrator with the temporary CLI flag:
 
