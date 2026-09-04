@@ -1,0 +1,15 @@
+# Nix build results and local environment state.
+/result
+/result-*
+/.direnv/
+
+# Local secrets must never be imported into Nix or committed.
+/.env
+/.env.*
+!/.env.example
+/secrets/
+
+# Editor temporary files.
+*.swp
+*.swo
+*~
