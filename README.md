@@ -10,6 +10,7 @@ Flat, explicit NixOS modules, with locked inputs. Required machine setup belongs
 | `dev-authorized-keys` | Public SSH keys for `dev`—never private keys |
 | `tools.nix` | Git, declarative user Git policy, official Nix formatter |
 | `neovim.nix` | Editor and deployment of the unchanged upstream dotfiles |
+| [DESKTOP.md](DESKTOP.md) | Dated Hyprland/component research and proposed desktop; not deployed configuration |
 
 ## Account
 
