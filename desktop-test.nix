@@ -41,9 +41,13 @@ pkgs.testers.runNixOSTest {
         "-display egl-headless,rendernode=${hostRenderNode}"
       ];
     };
-    environment.sessionVariables = pkgs.lib.optionalAttrs (hostRenderNode == null) {
+    # VirGL exposes OpenGL, not Vulkan. Keep GTK/WGPU off guest-side lavapipe.
+    environment.sessionVariables = {
+      GSK_RENDERER = "gl";
+      WGPU_BACKEND = "gl";
+    }
+    // pkgs.lib.optionalAttrs (hostRenderNode == null) {
       LIBGL_ALWAYS_SOFTWARE = "1";
-      # Prevent llvmpipe from monopolizing every emulated CPU under QEMU TCG.
       LP_NUM_THREADS = "1";
     };
     environment.systemPackages = [ pkgs.python3 ];

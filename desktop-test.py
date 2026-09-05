@@ -71,8 +71,9 @@ machine.succeed("systemctl is-active systemd-resolved")
 launch("terminal", "kitty --title 'Workspace ready' sh -c " + shlex.quote(
     "printf '\\n  WORKSPACE READY\\n\\n'; "
     "zsh --version; kitty --version; git --version; printf 'Pi: '; command -v pi; "
-    "printf '\\n  Ctrl-R history  |  Ctrl-T files  |  Alt-C directories\\n'; "
-    "printf '  Super-Space launcher  |  Super-Enter terminal\\n\\n'; exec zsh -i"
+    "printf '\\n  Ctrl-R history  |  Ctrl-T files\\n'; "
+    "printf '  Alt-C directories  |  Super-Space launcher\\n'; "
+    "printf '  Super-Enter terminal  |  Super-F fullscreen\\n\\n'; exec zsh -i"
 ))
 launch("monitor", "kitty --title 'System monitor' -e btop")
 machine.wait_until_succeeds("pgrep -u dev btop")
@@ -81,9 +82,9 @@ screenshot("desktop-100")
 
 launch("launcher", "anyrun")
 wait_layer("anyrun")
-machine.sleep(2)
-machine.send_chars("kitty")
-machine.sleep(2)
+machine.sleep(5)
+machine.send_chars("kitty", delay=0.1)
+machine.sleep(5)
 screenshot("launcher-100")
 machine.send_key("esc")
 session("notify-send 'Desktop ready' 'Readable text, working audio and native Wayland services.'")
@@ -98,12 +99,16 @@ session("hyprctl eval " + shlex.quote(
 ))
 machine.sleep(4)
 assert json.loads(session("hyprctl -j monitors"))[0]["scale"] == 1.5
+# At 150%, a half-screen btop is below its 80-column minimum: use Super-F.
+machine.send_key("meta_l-f")
+machine.sleep(3)
 screenshot("desktop-150")
+machine.send_key("meta_l-f")
 
 # Exercise real PAM/session locking using the disposable fixture password.
 session("loginctl lock-session")
 machine.wait_until_succeeds("pgrep -u dev hyprlock")
-machine.sleep(2)
+machine.sleep(8)
 screenshot("lock-150")
 machine.send_chars("incorrect")
 machine.send_key("ret")
@@ -118,7 +123,10 @@ session("hyprctl eval " + shlex.quote(
     'hl.monitor({output=' + json.dumps(output) + ',mode="1920x1080@60",position="0x0",scale=1})'
 ))
 launch("audio", "pavucontrol")
-machine.sleep(3)
+machine.wait_until_succeeds(in_session(
+    "hyprctl -j clients | jq -e '.[] | select(.class | ascii_downcase | contains(\"pavucontrol\"))'"
+), timeout=180)
+machine.sleep(5)
 screenshot("audio-controls")
 
 # Preferences must not be a read-only Home Manager symlink.
