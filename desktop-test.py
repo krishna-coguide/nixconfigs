@@ -2,16 +2,36 @@ import json
 import shlex
 
 
-def user(command):
-    return machine.succeed(
-        "runuser -u dev -- env XDG_RUNTIME_DIR=/run/user/1001 "
-        "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1001/bus "
-        "bash -lc " + shlex.quote(command)
+def as_user(command):
+    return "runuser --login dev --command " + shlex.quote(
+        "export XDG_RUNTIME_DIR=/run/user/1001 "
+        "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1001/bus; " + command
     )
 
 
+def user(command):
+    return machine.succeed(as_user(command), timeout=90)
+
+
+def in_session(command):
+    return as_user("systemd-run --quiet --user --wait --pipe --collect sh -c " + shlex.quote(command))
+
+
 def session(command):
-    return user("systemd-run --quiet --user --wait --pipe --collect sh -c " + shlex.quote(command))
+    return machine.succeed(in_session(command), timeout=90)
+
+
+def wait_layer(namespace):
+    machine.wait_until_succeeds(in_session(
+        "hyprctl -j layers | jq -e " + shlex.quote('.. | objects | select(.namespace? == ' + json.dumps(namespace) + ')')
+    ), timeout=180)
+
+
+def screenshot(name):
+    # Capture through Wayland; QEMU's framebuffer dump cannot read VirGL surfaces.
+    path = "/tmp/" + name + ".png"
+    session("grim " + shlex.quote(path))
+    machine.copy_from_vm(path)
 
 
 def launch(name, command):
@@ -33,40 +53,43 @@ try:
         )
 except Exception:
     print(machine.succeed("journalctl -b --no-pager _UID=1001"))
-    print(machine.execute("find /home/dev/.cache/hyprland -type f -maxdepth 2 -exec tail -n 100 {} ';'"))
+    print(machine.execute("find /home/dev/.cache/hyprland -maxdepth 2 -type f -exec tail -n 100 {} ';'"))
     machine.screenshot("startup-failed")
     raise
 
-machine.screenshot("startup")
+wait_layer("ashell-main-layer")
+screenshot("startup")
 assert session("hyprctl configerrors").strip() in ("", "ok")
 assert "JetBrainsMono" in user("fc-match 'JetBrainsMono Nerd Font'")
 assert "Inter" in user("fc-match Inter")
-assert "0." in user("pi --version")
+# Pi's real --version is checked natively; avoid costly Node startup under TCG.
+user("test -x /run/current-system/sw/bin/pi")
 assert "zsh" in user("getent passwd dev")
 assert "test-speakers" in session("wpctl status --name")
 machine.succeed("systemctl is-active systemd-resolved")
 
 launch("terminal", "kitty --title 'Workspace ready' sh -c " + shlex.quote(
     "printf '\\n  WORKSPACE READY\\n\\n'; "
-    "zsh --version; kitty --version; pi --version; git --version; "
+    "zsh --version; kitty --version; git --version; printf 'Pi: '; command -v pi; "
     "printf '\\n  Ctrl-R history  |  Ctrl-T files  |  Alt-C directories\\n'; "
     "printf '  Super-Space launcher  |  Super-Enter terminal\\n\\n'; exec zsh -i"
 ))
 launch("monitor", "kitty --title 'System monitor' -e btop")
 machine.wait_until_succeeds("pgrep -u dev btop")
 machine.sleep(5)
-machine.screenshot("desktop-100")
+screenshot("desktop-100")
 
 launch("launcher", "anyrun")
+wait_layer("anyrun")
 machine.sleep(2)
 machine.send_chars("kitty")
 machine.sleep(2)
-machine.screenshot("launcher-100")
+screenshot("launcher-100")
 machine.send_key("esc")
 session("notify-send 'Desktop ready' 'Readable text, working audio and native Wayland services.'")
-assert user("systemctl --user is-active mako").strip() == "active"
+assert '"mako"' in user("busctl --user call org.freedesktop.Notifications /org/freedesktop/Notifications org.freedesktop.Notifications GetServerInformation")
 machine.sleep(1)
-machine.screenshot("notification-100")
+screenshot("notification-100")
 
 monitors = json.loads(session("hyprctl -j monitors"))
 output = monitors[0]["name"]
@@ -75,13 +98,13 @@ session("hyprctl eval " + shlex.quote(
 ))
 machine.sleep(4)
 assert json.loads(session("hyprctl -j monitors"))[0]["scale"] == 1.5
-machine.screenshot("desktop-150")
+screenshot("desktop-150")
 
 # Exercise real PAM/session locking using the disposable fixture password.
 session("loginctl lock-session")
 machine.wait_until_succeeds("pgrep -u dev hyprlock")
 machine.sleep(2)
-machine.screenshot("lock-150")
+screenshot("lock-150")
 machine.send_chars("incorrect")
 machine.send_key("ret")
 machine.sleep(3)
@@ -96,7 +119,7 @@ session("hyprctl eval " + shlex.quote(
 ))
 launch("audio", "pavucontrol")
 machine.sleep(3)
-machine.screenshot("audio-controls")
+screenshot("audio-controls")
 
 # Preferences must not be a read-only Home Manager symlink.
 user("test -w ~/.config/keepassxc/keepassxc.ini && test ! -L ~/.config/keepassxc/keepassxc.ini")

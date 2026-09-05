@@ -1,5 +1,9 @@
 # Disposable graphical audit. Test credentials/autologin NEVER reach the host.
-{ pkgs, inputs }:
+{
+  pkgs,
+  inputs,
+  hostRenderNode ? null,
+}:
 pkgs.testers.runNixOSTest {
   name = "development-desktop";
   node.pkgsReadOnly = false;
@@ -20,19 +24,28 @@ pkgs.testers.runNixOSTest {
       ./workstation.nix
     ];
     system.stateVersion = "26.05";
+    boot.blacklistedKernelModules = [ "floppy" ];
     virtualisation = {
       memorySize = 6144;
-      cores = 4;
+      diskSize = 4096;
+      cores = 8;
       resolution = {
         x = 1920;
         y = 1080;
       };
       qemu.options = [
         "-vga none"
-        "-device virtio-gpu-pci,xres=1920,yres=1080"
+        "-device virtio-gpu${if hostRenderNode == null then "" else "-gl"}-pci,xres=1920,yres=1080"
+      ]
+      ++ pkgs.lib.optionals (hostRenderNode != null) [
+        "-display egl-headless,rendernode=${hostRenderNode}"
       ];
     };
-    environment.sessionVariables.LIBGL_ALWAYS_SOFTWARE = "1";
+    environment.sessionVariables = pkgs.lib.optionalAttrs (hostRenderNode == null) {
+      LIBGL_ALWAYS_SOFTWARE = "1";
+      # Prevent llvmpipe from monopolizing every emulated CPU under QEMU TCG.
+      LP_NUM_THREADS = "1";
+    };
     environment.systemPackages = [ pkgs.python3 ];
     users.users.dev.hashedPasswordFile = toString (
       pkgs.runCommand "test-only-password-hash" { nativeBuildInputs = [ pkgs.mkpasswd ]; } ''

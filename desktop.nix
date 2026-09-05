@@ -10,12 +10,31 @@ let
   wallpaper = pkgs.runCommand "quiet-orbit.png" { nativeBuildInputs = [ pkgs.resvg ]; } ''
     resvg ${./wallpaper.svg} "$out"
   '';
+  wallpaperInit = pkgs.writeShellApplication {
+    name = "initialize-wallpaper";
+    runtimeInputs = [
+      pkgs.awww
+      pkgs.coreutils
+    ];
+    text = ''
+      # Socket readiness precedes Wayland output discovery on a cold login.
+      for ((attempt=0; attempt<30; attempt++)); do
+        if awww img ${wallpaper} --transition-type fade --transition-duration 0.5; then
+          exit 0
+        fi
+        sleep 0.5
+      done
+      echo 'No wallpaper output became ready.' >&2
+      exit 1
+    '';
+  };
   screenshot = pkgs.writeShellApplication {
     name = "desktop-screenshot";
     runtimeInputs = with pkgs; [
       grim
       slurp
       satty
+      wl-clipboard
       coreutils
     ];
     text = ''
@@ -130,10 +149,8 @@ in
     qt = {
       enable = true;
       platformTheme.name = "gtk3";
-      style = {
-        name = "adwaita-dark";
-        package = pkgs.adwaita-qt;
-      };
+      # Let Home Manager provide BOTH Qt 5 and Qt 6 style plugins.
+      style.name = "adwaita-dark";
     };
     dconf.settings."org/gnome/desktop/interface" = {
       color-scheme = "prefer-dark";
@@ -152,8 +169,9 @@ in
     services.hyprpolkitagent.enable = true;
     services.awww.enable = true;
     systemd.user.services.awww.Service = {
-      Type = "notify"; # awww 0.12 signals socket readiness; no guessed sleep.
-      ExecStartPost = "${pkgs.awww}/bin/awww img ${wallpaper} --transition-type fade --transition-duration 0.5";
+      Type = "notify";
+      CacheDirectory = "awww";
+      ExecStartPost = "${wallpaperInit}/bin/initialize-wallpaper";
     };
 
     programs.ashell = {

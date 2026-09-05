@@ -25,6 +25,7 @@ hl.config({
         touchpad = { natural_scroll = true, tap_to_click = true },
     },
     misc = { disable_hyprland_logo = true, force_default_wallpaper = 0 },
+    ecosystem = { no_update_news = true },
 })
 hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")

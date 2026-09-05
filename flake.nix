@@ -43,6 +43,14 @@
         in
         {
           desktop = import ./desktop-test.nix { inherit inputs pkgs; };
+          desktop-config =
+            pkgs.runCommand "hyprland-config-check" { nativeBuildInputs = [ pkgs.hyprland ]; }
+              ''
+                export HOME="$TMPDIR/home" XDG_RUNTIME_DIR="$TMPDIR/runtime"
+                mkdir -m 700 -p "$HOME" "$XDG_RUNTIME_DIR"
+                Hyprland --verify-config -c ${./hyprland.lua}
+                touch "$out"
+              '';
           updates =
             pkgs.runCommand "update-workflow-check"
               {

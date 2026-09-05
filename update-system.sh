@@ -28,7 +28,8 @@ if git diff --quiet -- flake.lock; then
   exit 0
 fi
 nix flake check --no-build --no-update-lock-file
-nix build .#checks.x86_64-linux.updates --no-update-lock-file --no-link
+nix build .#checks.x86_64-linux.updates .#checks.x86_64-linux.desktop-config \
+  --no-update-lock-file --no-link
 git add flake.lock
 git -c user.name='NixOS Updater' -c user.email='nixos-updater@localhost' \
   commit -m 'chore: update stable NixOS and Home Manager inputs'
