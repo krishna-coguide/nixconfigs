@@ -8,10 +8,15 @@ Flat, explicit NixOS modules, with locked inputs. Required machine setup belongs
 | `configuration.nix` | EC2 base, platform, Nix features, compatibility version, imports |
 | `users.nix` | `dev`, SSH/sudo, Home Manager integration, workspace/repo ownership |
 | `dev-authorized-keys` | Public SSH keys for `dev`—never private keys |
-| `tools.nix`, `colors.nix` | Zsh, Alacritty, Starship, fzf, Yazi, btop, Git policy and common CLI tools; shared readable palette |
+| `tools.nix`, `colors.nix` | Zsh, Kitty, Pi, Starship, fzf, Yazi, btop, Git policy and common CLI tools; shared readable palette |
+| `desktop.nix`, `hyprland.lua`, `anyrun.css`, `wallpaper.svg` | Hyprland/UWSM, bar, launcher, original wallpaper, notifications, lock/idle, PipeWire and desktop styling |
+| `apps.nix` | Firefox ESR, KeePassXC, Thunderbird, Steam, Element, Slack and Zathura |
+| `workstation.nix`, `nvidia.nix` | Separately selected physical-workstation/greeter and NVIDIA integration; not enabled on EC2 |
+| `updates.nix`, `update-system.sh` | Daily stable-input updates in an isolated Git worktree; validated commits, no forced reboot or GC |
+| `desktop-test.nix`, `desktop-test.py`, `update-test.py` | Disposable graphical audit and updater failure/concurrency tests |
 | `network.nix` | systemd-resolved and network/WireGuard diagnostics; leaves interface management with the host |
 | `neovim.nix` | Editor and deployment of the unchanged upstream dotfiles |
-| [DESKTOP.md](DESKTOP.md) | Dated Hyprland/component research and proposed desktop; not deployed configuration |
+| [DESKTOP.md](DESKTOP.md) | Historical component research; executable configuration is in the files above |
 
 ## Account
 
@@ -21,7 +26,9 @@ Flat, explicit NixOS modules, with locked inputs. Required machine setup belongs
 - `/etc/nixos` is writable by `dev` through a native tmpfiles ownership rule, which does not follow store symlinks.
 - Nix daemon access stays untrusted for ordinary use. Sudo is a separate, explicit administrative capability.
 - The declared daily shell is Zsh, with completion, suggestions, highlighting, Starship, fzf (`Ctrl-R`, `Ctrl-T`, `Alt-C`), and zoxide (`z`, `zi`). Root/SSM shells are not changed.
-- Alacritty uses an opaque dark background, 13pt JetBrains Mono and generous padding. `Ctrl-Shift-+` / `Ctrl-Shift--` zoom its font; `Ctrl-Shift-0` resets it. `y` opens Yazi with shell-directory integration.
+- Kitty uses an opaque dark background, 13pt JetBrains Mono and generous padding. `Ctrl-Shift-+` / `Ctrl-Shift--` zoom its font; `Ctrl-Shift-Backspace` resets it. `y` opens Yazi with shell-directory integration.
+- Desktop keys: `Super-Enter` Kitty, `Super-Space` launcher, `Super-E` Yazi, `Super-B` Firefox, `Super-P` KeePassXC, `Super-Escape` lock, `Super-Q` close, `Super-1…0` workspaces, `Print` screenshot/annotation. Launch the **Hyprland (uwsm-managed)** session.
+- KeePassXC preferences are seeded once and remain writable. Open/create your own vault and pair its browser extension; no vault, account or VPN credentials are embedded. The physical-workstation module requires a securely provisioned `hashedPasswordFile`; EC2 gets no greeter or autologin.
 - `wg` and `wg-quick` are installed without any tunnels, peers, keys or added firewall ports. `resolvectl` is backed by resolved; DHCP remains under the existing host network manager.
 
 Enter from an administrator session with `sudo -iu dev`.
@@ -81,7 +88,8 @@ Make focused changes, format/evaluate them, and commit regularly. Build and acti
 
 ## Updates and safety
 
-- To change a pinned source, update its revision in `flake.nix`, regenerate `flake.lock` with `nix flake lock`, review the diff, then check/build before switching. No unattended updates.
+- `nixos-update.timer` checks daily with up to one hour of jitter. Only the stable Nixpkgs/Home Manager branches advance; Neovim's source stays fixed. The updater skips a dirty repository, builds in a detached worktree, records a tested commit and applies it without rebooting. It attempts rollback if activation fails and retains recovery generations. Inspect `journalctl -u nixos-update` or trigger it with `sudo systemctl start nixos-update`.
+- For a manual input refresh: `nix flake update nixpkgs home-manager`, review `flake.lock`, then check/build. The exact resolved revisions and hashes remain committed.
 - Keep the EC2 module, sandboxing, signature verification and recovery access intact.
 - `system.stateVersion` and `home.stateVersion` are both `26.05`; these preserve compatibility, not package versions.
 - `test` activates changes too; it is not a dry run. Keep the original system generation.

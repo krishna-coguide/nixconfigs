@@ -12,6 +12,9 @@
     ./users.nix
     ./tools.nix
     ./network.nix
+    ./desktop.nix
+    ./apps.nix
+    ./updates.nix
     ./neovim.nix
   ];
 

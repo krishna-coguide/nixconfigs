@@ -9,6 +9,7 @@ in
 
   environment.systemPackages = with pkgs; [
     nixfmt
+    pi-coding-agent
     ripgrep
     fd
     eza
@@ -155,94 +156,45 @@ in
       };
     };
 
-    programs.alacritty = {
+    programs.kitty = {
       enable = true;
+      font = {
+        name = "JetBrainsMono Nerd Font";
+        size = 13;
+      };
       settings = {
-        window = {
-          padding = {
-            x = 16;
-            y = 12;
-          };
-          dynamic_padding = true;
-          decorations = "None";
-          opacity = 1.0;
-        };
-        font = {
-          normal = {
-            family = "JetBrainsMono Nerd Font";
-            style = "Regular";
-          };
-          bold = {
-            family = "JetBrainsMono Nerd Font";
-            style = "Bold";
-          };
-          italic = {
-            family = "JetBrainsMono Nerd Font";
-            style = "Italic";
-          };
-          size = 13.0;
-          offset.y = 2;
-        };
-        cursor = {
-          style = {
-            shape = "Beam";
-            blinking = "Off";
-          };
-          unfocused_hollow = true;
-        };
-        scrolling.history = 20000;
-        selection.save_to_clipboard = false;
-        colors = {
-          primary = {
-            background = c.background;
-            foreground = c.text;
-          };
-          cursor = {
-            text = c.background;
-            cursor = c.cyan;
-          };
-          selection = {
-            text = c.text;
-            background = "#354562";
-          };
-          normal = {
-            black = c.surface;
-            red = c.red;
-            green = c.green;
-            yellow = c.yellow;
-            blue = c.blue;
-            magenta = c.purple;
-            cyan = c.cyan;
-            white = "#dde1e6";
-          };
-          bright = {
-            black = c.muted;
-            red = "#ff99a0";
-            green = "#6fdc8c";
-            yellow = "#f7d75c";
-            blue = "#a6c8ff";
-            magenta = "#d4bbff";
-            cyan = "#82e9de";
-            white = c.text;
-          };
-        };
-        keyboard.bindings = [
-          {
-            key = "Equals";
-            mods = "Control|Shift";
-            action = "IncreaseFontSize";
-          }
-          {
-            key = "Minus";
-            mods = "Control|Shift";
-            action = "DecreaseFontSize";
-          }
-          {
-            key = "Key0";
-            mods = "Control|Shift";
-            action = "ResetFontSize";
-          }
-        ];
+        window_padding_width = 14;
+        background_opacity = "1.0";
+        hide_window_decorations = true;
+        scrollback_lines = 20000;
+        enable_audio_bell = false;
+        cursor_shape = "beam";
+        cursor_blink_interval = 0;
+        adjust_line_height = "110%";
+        foreground = c.text;
+        background = c.background;
+        cursor = c.cyan;
+        selection_foreground = c.text;
+        selection_background = "#354562";
+        url_color = c.blue;
+        active_border_color = c.blue;
+        inactive_border_color = c.border;
+        color0 = c.surface;
+        color1 = c.red;
+        color2 = c.green;
+        color3 = c.yellow;
+        color4 = c.blue;
+        color5 = c.purple;
+        color6 = c.cyan;
+        color7 = "#dde1e6";
+        color8 = c.muted;
+        color9 = "#ff99a0";
+        color10 = "#6fdc8c";
+        color11 = "#f7d75c";
+        color12 = "#a6c8ff";
+        color13 = "#d4bbff";
+        color14 = "#82e9de";
+        color15 = c.text;
       };
     };
   };

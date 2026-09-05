@@ -1,0 +1,24 @@
+* { font-family: Inter, sans-serif; font-size: 17px; }
+window { background: transparent; }
+box.main {
+  padding: 14px;
+  margin: 18px;
+  border-radius: 16px;
+  border: 2px solid #78a9ff;
+  background: #161616;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, .35);
+}
+text {
+  color: #f2f4f8;
+  background: #262626;
+  min-height: 38px;
+  padding: 10px 14px;
+  border-radius: 9px;
+}
+.matches, list.plugin { background: transparent; }
+box.plugin:first-child { margin-top: 10px; }
+.match { padding: 9px; border-radius: 9px; background: transparent; }
+.match:selected { background: #2e3f5f; }
+label.match { color: #f2f4f8; }
+label.match.description { font-size: 14px; color: #a2a9b0; }
+label.plugin.info { color: #a2a9b0; }
