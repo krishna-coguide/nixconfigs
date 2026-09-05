@@ -65,7 +65,13 @@ assert "Inter" in user("fc-match Inter")
 # Pi's real --version is checked natively; avoid costly Node startup under TCG.
 user("test -x /run/current-system/sw/bin/pi")
 assert "zsh" in user("getent passwd dev")
-assert "test-speakers" in session("wpctl status --name")
+# QEMU emulates HDA with a silent host backend; exercise real ALSA/PipeWire nodes.
+machine.wait_until_succeeds(in_session("wpctl inspect @DEFAULT_AUDIO_SINK@ | grep -q alsa_output"), timeout=90)
+session("wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.42")
+assert "0.42" in session("wpctl get-volume @DEFAULT_AUDIO_SINK@")
+session("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ 1")
+assert "MUTED" in session("wpctl get-volume @DEFAULT_AUDIO_SOURCE@")
+session("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ 0")
 machine.succeed("systemctl is-active systemd-resolved")
 
 launch("terminal", "kitty --title 'Workspace ready' sh -c " + shlex.quote(

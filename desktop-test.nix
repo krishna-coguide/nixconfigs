@@ -35,6 +35,9 @@ pkgs.testers.runNixOSTest {
       };
       qemu.options = [
         "-vga none"
+        "-audiodev none,id=test-audio"
+        "-device ich9-intel-hda"
+        "-device hda-duplex,audiodev=test-audio"
         "-device virtio-gpu${if hostRenderNode == null then "" else "-gl"}-pci,xres=1920,yres=1080"
       ]
       ++ pkgs.lib.optionals (hostRenderNode != null) [
@@ -50,7 +53,6 @@ pkgs.testers.runNixOSTest {
       LIBGL_ALWAYS_SOFTWARE = "1";
       LP_NUM_THREADS = "1";
     };
-    environment.systemPackages = [ pkgs.python3 ];
     users.users.dev.hashedPasswordFile = toString (
       pkgs.runCommand "test-only-password-hash" { nativeBuildInputs = [ pkgs.mkpasswd ]; } ''
         mkpasswd --method=sha-512 --salt=nixostest desktop-test > "$out"
@@ -60,21 +62,6 @@ pkgs.testers.runNixOSTest {
       user = "dev";
       command = "${pkgs.uwsm}/bin/uwsm start -e -D Hyprland hyprland.desktop";
     };
-    services.pipewire.extraConfig.pipewire."99-test-audio"."context.objects" = [
-      {
-        factory = "adapter";
-        args = {
-          "factory.name" = "support.null-audio-sink";
-          "node.name" = "test-speakers";
-          "node.description" = "Test speakers";
-          "media.class" = "Audio/Sink";
-          "audio.position" = [
-            "FL"
-            "FR"
-          ];
-        };
-      }
-    ];
   };
   testScript = builtins.readFile ./desktop-test.py;
 }
