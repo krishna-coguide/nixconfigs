@@ -358,6 +358,7 @@ in
             valign = "center";
             outline_thickness = 2;
             dots_center = true;
+            fade_on_empty = false;
             font_family = "Inter";
             inner_color = "rgb(262626)";
             outer_color = "rgb(78a9ff)";

@@ -7,6 +7,16 @@
 
 let
   c = import ./colors.nix;
+  # Select secure storage without rebuilding the cached Electron application.
+  elementWithKeyring = pkgs.symlinkJoin {
+    name = "element-desktop-with-keyring-${pkgs.element-desktop.version}";
+    paths = [ pkgs.element-desktop ];
+    nativeBuildInputs = [ pkgs.makeWrapper ];
+    postBuild = ''
+      wrapProgram "$out/bin/element-desktop" --add-flags "--password-store=gnome-libsecret"
+    '';
+    inherit (pkgs.element-desktop) meta;
+  };
   browserAddon = pkgs.fetchurl {
     name = "keepassxc-browser-1.10.3.xpi";
     url = "https://addons.mozilla.org/firefox/downloads/file/4831838/keepassxc_browser-1.10.3.xpi";
@@ -73,7 +83,9 @@ in
   home-manager.users.dev = {
     home.packages = with pkgs; [
       thunderbird
-      element-desktop
+      # Electron does not reliably detect a keyring under Hyprland. Use the
+      # KeePassXC Secret Service explicitly; never fall back to basic_text.
+      elementWithKeyring
       slack
     ];
     programs.keepassxc = {

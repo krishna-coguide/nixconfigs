@@ -106,6 +106,10 @@ session("hyprctl eval " + shlex.quote(
 machine.sleep(4)
 assert json.loads(session("hyprctl -j monitors"))[0]["scale"] == 1.5
 # At 150%, a half-screen btop is below its 80-column minimum: use Super-F.
+# Closing the launcher can restore focus to either terminal; select btop explicitly.
+monitor = next(c for c in json.loads(session("hyprctl -j clients")) if c["initialTitle"] == "System monitor")
+session("hyprctl dispatch " + shlex.quote('hl.dsp.focus({window="address:' + monitor["address"] + '"})'))
+assert json.loads(session("hyprctl -j activewindow"))["address"] == monitor["address"]
 machine.send_key("meta_l-f")
 machine.sleep(3)
 screenshot("desktop-150")
@@ -138,6 +142,8 @@ screenshot("audio-controls")
 # Preferences must not be a read-only Home Manager symlink.
 user("test -w ~/.config/keepassxc/keepassxc.ini && test ! -L ~/.config/keepassxc/keepassxc.ini")
 user("grep -q 'UpdateBinaryPath=false' ~/.config/keepassxc/keepassxc.ini")
+user("grep -q -- '--password-store=gnome-libsecret' \"$(command -v element-desktop)\"")
+user("grep -Eq 'fade_on_empty *= *false' ~/.config/hypr/hyprlock.conf")
 assert "libapplications.so" in user("cat ~/.config/anyrun/config.ron")
 session("hyprctl clients")
 machine.succeed("journalctl -b -p err --no-pager > /tmp/desktop-errors.log")

@@ -13,9 +13,9 @@ Flat, explicit NixOS modules, with locked inputs. Required machine setup belongs
 | `apps.nix` | Firefox ESR, KeePassXC, Thunderbird, Steam, Element, Slack and Zathura |
 | `workstation.nix`, `nvidia.nix` | Separately selected physical-workstation/greeter and NVIDIA integration; not enabled on EC2 |
 | `updates.nix`, `update-system.sh` | Daily stable-input updates in an isolated Git worktree; validated commits, no forced reboot or GC |
-| `desktop-test.nix`, `desktop-test.py`, `update-test.py` | Disposable graphical audit and updater failure/concurrency tests |
+| `desktop-test.nix`, `desktop-test.py`, `audit-desktop.sh`, `update-test.py` | Disposable graphical audit and updater failure/concurrency tests |
 | `network.nix` | systemd-resolved and network/WireGuard diagnostics; leaves interface management with the host |
-| `neovim.nix` | Editor and deployment of the unchanged upstream dotfiles |
+| `neovim.nix`, `neovim-test.lua` | Editor, unchanged upstream dotfile deployment and opt-in native runtime audit |
 | [DESKTOP.md](DESKTOP.md) | Historical component research; executable configuration is in the files above |
 
 ## Account
@@ -29,6 +29,7 @@ Flat, explicit NixOS modules, with locked inputs. Required machine setup belongs
 - Kitty uses an opaque dark background, 13pt JetBrains Mono and generous padding. `Ctrl-Shift-+` / `Ctrl-Shift--` zoom its font; `Ctrl-Shift-Backspace` resets it. `y` opens Yazi with shell-directory integration.
 - Desktop keys: `Super-Enter` Kitty, `Super-Space` launcher, `Super-E` Yazi, `Super-B` Firefox, `Super-P` KeePassXC, `Super-Escape` lock, `Super-Q` close, `Super-1…0` workspaces, `Print` screenshot/annotation. Launch the **Hyprland (uwsm-managed)** session.
 - KeePassXC preferences are seeded once and remain writable. Open/create your own vault and pair its browser extension; no vault, account or VPN credentials are embedded. The physical-workstation module requires a securely provisioned `hashedPasswordFile`; EC2 gets no greeter or autologin.
+- Element uses libsecret for encrypted local storage through KeePassXC. Before using it, create/open your own vault and select a dedicated application-token group in **Database Settings → Secret Service Integration**. Keep that vault unlocked when requested. Do not select Element's weaker/no-encryption fallback. Vault setup and application authentication are intentionally user-controlled.
 - `wg` and `wg-quick` are installed without any tunnels, peers, keys or added firewall ports. `resolvectl` is backed by resolved; DHCP remains under the existing host network manager.
 
 Enter from an administrator session with `sudo -iu dev`.
@@ -41,7 +42,8 @@ As `dev`, from `/etc/nixos`:
 
 ```sh
 nixfmt --check ./*.nix
-nix flake check --no-update-lock-file
+nix flake check --no-build --no-update-lock-file
+nix build .#checks.x86_64-linux.updates .#checks.x86_64-linux.desktop-config --no-link
 nix build .#nixosConfigurations.dev.config.system.build.toplevel --no-update-lock-file
 ```
 
@@ -83,7 +85,9 @@ Home Manager deploys its files under `~/.config/nvim`, with the **Lua, AstroNvim
 
 ## Validation and commits
 
-The initial deployment was tested with an empty disposable home: all upstream files were reproduced byte-for-byte, the Lazy lock remained writable across repeated activation, and the migration preserved local data and refused to overwrite an existing backup. The real plugin bootstrap is a separate runtime test, not covered by these file-deployment checks.
+The initial deployment was tested with an empty disposable home: all upstream files were reproduced byte-for-byte, the Lazy lock remained writable across repeated activation, and the migration preserved local data and refused to overwrite an existing backup. The real plugin bootstrap is a separate runtime test, not covered by these file-deployment checks. As `dev`, run `nvim --headless ~/.config/nvim/init.lua -c 'luafile /etc/nixos/neovim-test.lua'` for a bounded runtime check of Lazy, the configured Mason tools (including executable startup), and nine parsers. This uses the existing writable plugin/Mason cache and may download dependencies; it does not edit the managed Lua or save buffers.
+
+Run the graphical test separately with `./audit-desktop.sh`. An optional accessible render node, for example `./audit-desktop.sh /dev/dri/renderD128`, moves rendering out of QEMU's CPU emulation without touching the host display. Screenshots and logs go to `~/.cache/desktop-audit/run.*`. The test uses an isolated VM, test-only credentials and an emulated sound card with a silent backend. It checks session services, fonts, 100%/150% scaling, real PAM lock/unlock, speaker volume, microphone mute and audio controls. Hardware audio, NVIDIA, suspend and mixed-monitor behavior still need the target workstation. `nix flake check` without `--no-build` also runs the software-rendered VM and can be very slow without KVM.
 
 Make focused changes, format/evaluate them, and commit regularly. Build and activate a reviewed commit rather than accumulating uncommitted setup. `system.configurationRevision` records the source revision in the system generation. Do not put human identity guesses in Git settings or push to an unapproved remote.
 
