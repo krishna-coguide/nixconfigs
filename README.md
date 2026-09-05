@@ -8,7 +8,8 @@ Flat, explicit NixOS modules, with locked inputs. Required machine setup belongs
 | `configuration.nix` | EC2 base, platform, Nix features, compatibility version, imports |
 | `users.nix` | `dev`, SSH/sudo, Home Manager integration, workspace/repo ownership |
 | `dev-authorized-keys` | Public SSH keys for `dev`—never private keys |
-| `tools.nix` | Git, declarative user Git policy, official Nix formatter |
+| `tools.nix`, `colors.nix` | Zsh, Alacritty, Starship, fzf, Yazi, btop, Git policy and common CLI tools; shared readable palette |
+| `network.nix` | systemd-resolved and network/WireGuard diagnostics; leaves interface management with the host |
 | `neovim.nix` | Editor and deployment of the unchanged upstream dotfiles |
 | [DESKTOP.md](DESKTOP.md) | Dated Hyprland/component research and proposed desktop; not deployed configuration |
 
@@ -19,7 +20,9 @@ Flat, explicit NixOS modules, with locked inputs. Required machine setup belongs
 - `dev` is authorized by the public key in this repo. No private key or password is embedded.
 - `/etc/nixos` is writable by `dev` through a native tmpfiles ownership rule, which does not follow store symlinks.
 - Nix daemon access stays untrusted for ordinary use. Sudo is a separate, explicit administrative capability.
-- Bash is the temporary default; further shell/workflow preferences remain the user's choice.
+- The declared daily shell is Zsh, with completion, suggestions, highlighting, Starship, fzf (`Ctrl-R`, `Ctrl-T`, `Alt-C`), and zoxide (`z`, `zi`). Root/SSM shells are not changed.
+- Alacritty uses an opaque dark background, 13pt JetBrains Mono and generous padding. `Ctrl-Shift-+` / `Ctrl-Shift--` zoom its font; `Ctrl-Shift-0` resets it. `y` opens Yazi with shell-directory integration.
+- `wg` and `wg-quick` are installed without any tunnels, peers, keys or added firewall ports. `resolvectl` is backed by resolved; DHCP remains under the existing host network manager.
 
 Enter from an administrator session with `sudo -iu dev`.
 

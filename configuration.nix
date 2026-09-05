@@ -11,6 +11,7 @@
     "${modulesPath}/virtualisation/amazon-image.nix"
     ./users.nix
     ./tools.nix
+    ./network.nix
     ./neovim.nix
   ];
 

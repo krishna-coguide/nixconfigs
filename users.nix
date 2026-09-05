@@ -1,8 +1,11 @@
+{ pkgs, ... }:
+
 {
   users.users.dev = {
     isNormalUser = true;
     uid = 1001;
     description = "Development user";
+    shell = pkgs.zsh;
     extraGroups = [ "wheel" ];
     openssh.authorizedKeys.keyFiles = [ ./dev-authorized-keys ];
   };
