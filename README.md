@@ -74,6 +74,7 @@ The input is [the existing neovim-dots repository](https://git.cyber.ayyalasomay
 
 Home Manager deploys its files under `~/.config/nvim`, with the **Lua, AstroNvim, Lazy, Mason, plugins and keymaps unchanged**. `programs.neovim.configure` stays empty so Neovim discovers `init.lua` normally. No Nixvim or custom Lua loader.
 
+- `tools.nix` supplies GCC/Make, pkg-config, Python, Node, Lua 5.1/LuaRocks and `nix-ld` for the existing plugin builds and Mason's upstream Linux executables. These are runtime prerequisites, not a replacement plugin manager or project-template framework.
 - Configuration files are linked from the pinned source and managed by Nix. Change the upstream repo and its input revision rather than editing generated links.
 - Lazy's `lazy-lock.json` must remain writable. The config seeds a copy at `~/.local/state/nvim/locks/<dotfile-revision>.json` and links to it. A new dotfile revision gets its own original lock; repeated activation preserves runtime changes to an existing lock.
 - A declared migration preserves the earlier manual checkout intact at `~/projects/neovim-dots-before-nix`. It refuses to overwrite an existing backup. On a clean home this migration does nothing.

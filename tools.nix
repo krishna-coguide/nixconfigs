@@ -6,10 +6,20 @@ in
 {
   programs.git.enable = true;
   programs.zsh.enable = true;
+  # Mason's upstream Linux executables expect a conventional dynamic loader.
+  programs.nix-ld.enable = true;
 
   environment.systemPackages = with pkgs; [
     nixfmt
     pi-coding-agent
+    # Runtime build prerequisites for the unchanged Lazy/Mason plugin workflow.
+    gcc
+    gnumake
+    pkg-config
+    python3
+    nodejs
+    lua5_1
+    luajitPackages.luarocks
     ripgrep
     fd
     eza
