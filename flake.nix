@@ -2,8 +2,8 @@
   description = "Development host";
 
   inputs = {
-    # Keep the machine's existing Nixpkgs revision; this is not an upgrade.
-    nixpkgs.url = "github:NixOS/nixpkgs/d57af924f160a5084293c71c2043f058bd1cdb60";
+    # Reviewed stable 26.05 snapshot; update deliberately, not at boot/login.
+    nixpkgs.url = "github:NixOS/nixpkgs/a5cc6f2c37bf518436dc8d1c288ccd0c43c2f4c4";
 
     home-manager = {
       url = "github:nix-community/home-manager/65258d5c65a250189fde2e35f490d15e064c4c62";
