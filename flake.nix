@@ -27,6 +27,15 @@
         ];
       };
 
+      # Physical host: adds dev/Hyprland without removing kbot/Plasma.
+      nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
+        specialArgs = { inherit inputs; };
+        modules = [
+          ./physical.nix
+          home-manager.nixosModules.home-manager
+        ];
+      };
+
       formatter.x86_64-linux = nixpkgs.legacyPackages.x86_64-linux.nixfmt;
 
       nixosModules = {
@@ -43,6 +52,10 @@
         in
         {
           desktop = import ./desktop-test.nix { inherit inputs pkgs; };
+          physical-config = import ./physical-test.nix {
+            inherit pkgs;
+            config = inputs.self.nixosConfigurations.nixos.config;
+          };
           desktop-config =
             pkgs.runCommand "hyprland-config-check" { nativeBuildInputs = [ pkgs.hyprland ]; }
               ''

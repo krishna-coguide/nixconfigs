@@ -32,7 +32,5 @@
   systemd.tmpfiles.rules = [
     "d /home/dev/.config 0755 dev users -"
     "d /home/dev/projects 0755 dev users -"
-    # Keep the working repo editable by dev. Z does not follow store symlinks.
-    "Z /etc/nixos - dev users -"
   ];
 }

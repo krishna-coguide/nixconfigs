@@ -1,12 +1,17 @@
-# Development host
+# Development hosts
 
 Flat, explicit NixOS modules, with locked inputs. Required machine setup belongs in these configs—not a list of manual installs or dotfile copies.
+
+**Choose the host, not the login name:** `nixosConfigurations.nixos` is this physical UEFI/NVMe machine; `nixosConfigurations.dev` is EC2 only. Both add the `dev` account. Never activate the EC2 closure on the physical machine.
 
 | File | Owns |
 | --- | --- |
 | `flake.nix`, `flake.lock` | Host entry point and exact Nixpkgs/Home Manager/dotfile revisions and content hashes |
-| `configuration.nix` | EC2 base, platform, Nix features, compatibility version, imports |
-| `users.nix` | `dev`, SSH/sudo, Home Manager integration, workspace/repo ownership |
+| `configuration.nix` | EC2-only boot/storage/integration, updater and repo ownership |
+| `common.nix` | Shared dev environment, platform, Nix features and compatibility version |
+| `physical.nix`, `hardware-configuration.nix` | This physical host's systemd-boot/NVMe/Btrfs setup; retains `kbot`, Plasma/SDDM and NetworkManager while adding `dev` |
+| `physical-test.nix` | Regression checks for physical-host recovery access, storage, boot and VPN tools |
+| `users.nix` | `dev`, SSH/sudo, Home Manager integration and dev workspace ownership |
 | `dev-authorized-keys` | Public SSH keys for `dev`—never private keys |
 | `tools.nix`, `colors.nix` | Zsh, Kitty, Pi, Starship, fzf, Yazi, btop, Git policy and common CLI tools; shared readable palette |
 | `desktop.nix`, `hyprland.lua`, `anyrun.css`, `wallpaper.svg` | Hyprland/UWSM, bar, launcher, original wallpaper, notifications, lock/idle, PipeWire and desktop styling |
@@ -14,23 +19,23 @@ Flat, explicit NixOS modules, with locked inputs. Required machine setup belongs
 | `workstation.nix`, `nvidia.nix` | Separately selected physical-workstation/greeter and NVIDIA integration; not enabled on EC2 |
 | `updates.nix`, `update-system.sh` | Daily stable-input updates in an isolated Git worktree; validated commits, no forced reboot or GC |
 | `desktop-test.nix`, `desktop-test.py`, `audit-desktop.sh`, `update-test.py` | Disposable graphical audit and updater failure/concurrency tests |
-| `network.nix` | systemd-resolved and network/WireGuard diagnostics; leaves interface management with the host |
+| `network.nix` | WireGuard/OpenVPN clients and network diagnostics; optional resolved, host-owned interface management |
 | `neovim.nix`, `neovim-test.lua` | Editor, unchanged upstream dotfile deployment and opt-in native runtime audit |
 | [DESKTOP.md](DESKTOP.md) | Historical component research; executable configuration is in the files above |
 
 ## Account
 
 - Daily user: `dev`, UID 1001, home `/home/dev`, workspace `~/projects`.
-- Passwordless sudo is scoped to `dev`; existing SSM-user administration and root SSH recovery remain intact.
+- Passwordless sudo is scoped to `dev`; EC2's SSM-user administration and root SSH recovery remain intact. The physical host retains `kbot`'s existing wheel/sudo access.
 - `dev` is authorized by the public key in this repo. No private key or password is embedded.
-- `/etc/nixos` is writable by `dev` through a native tmpfiles ownership rule, which does not follow store symlinks.
+- On EC2 only, `/etc/nixos` is writable by `dev` through a native tmpfiles ownership rule, which does not follow store symlinks. The physical target leaves the original `/etc/nixos` recovery configs and `/home/kbot` untouched; `/etc/nix` remains administrator-managed.
 - Nix daemon access stays untrusted for ordinary use. Sudo is a separate, explicit administrative capability.
 - The declared daily shell is Zsh, with completion, suggestions, highlighting, Starship, fzf (`Ctrl-R`, `Ctrl-T`, `Alt-C`), and zoxide (`z`, `zi`). Root/SSM shells are not changed.
 - Kitty uses an opaque dark background, 13pt JetBrains Mono and generous padding. `Ctrl-Shift-+` / `Ctrl-Shift--` zoom its font; `Ctrl-Shift-Backspace` resets it. `y` opens Yazi with shell-directory integration.
 - Desktop keys: `Super-Enter` Kitty, `Super-Space` launcher, `Super-E` Yazi, `Super-B` Firefox, `Super-P` KeePassXC, `Super-Escape` lock, `Super-Q` close, `Super-1…0` workspaces, `Print` screenshot/annotation. Launch the **Hyprland (uwsm-managed)** session.
-- KeePassXC preferences are seeded once and remain writable. Open/create your own vault and pair its browser extension; no vault, account or VPN credentials are embedded. The physical-workstation module requires a securely provisioned `hashedPasswordFile`; EC2 gets no greeter or autologin.
+- KeePassXC preferences are seeded once and remain writable. Open/create your own vault and pair its browser extension; no vault, account or VPN credentials are embedded. The optional ReGreet module (`workstation.nix`, not used by either host here) requires a securely provisioned `hashedPasswordFile`; the physical host keeps SDDM and a locally set `dev` password. EC2 gets no greeter or autologin.
 - Element uses libsecret for encrypted local storage through KeePassXC. Before using it, create/open your own vault and select a dedicated application-token group in **Database Settings → Secret Service Integration**. Keep that vault unlocked when requested. Do not select Element's weaker/no-encryption fallback. Vault setup and application authentication are intentionally user-controlled.
-- `wg` and `wg-quick` are installed without any tunnels, peers, keys or added firewall ports. `resolvectl` is backed by resolved; DHCP remains under the existing host network manager.
+- `wg`, `wg-quick`, OpenVPN, `iperf3`, `nmap`, `traceroute`, `whois`, `mtr`, DNS tools, `tcpdump`, `ethtool`, `nc` and `socat` are installed without any tunnels, peers, keys or added firewall ports. The physical host also has NetworkManager's OpenVPN plugin and keeps its existing DNS setup. EC2 uses resolved; DHCP remains under each host's network manager.
 
 Enter from an administrator session with `sudo -iu dev`.
 
@@ -38,7 +43,68 @@ Git author identity and remote destination are deliberately unset. `user.useConf
 
 ## Build and apply
 
-As `dev`, from `/etc/nixos`:
+### Physical machine: keep kbot and add dev
+
+`physical.nix` preserves `kbot` (UID 1000, `/home/kbot`, existing password, wheel/NetworkManager groups), KDE Plasma, SDDM, printing, locale/time zone, and the installed filesystems/boot loader. Home Manager manages **only `dev`**, UID 1001 with its own `/home/dev`. No autologin, password copying, or replacement greeter is enabled. The EC2 automatic updater is deliberately **not imported**.
+
+The hardware file is a tracked copy of this machine's `/etc/nixos/hardware-configuration.nix`; do not use it unchanged on another machine. The original `/etc/nixos` files remain available as recovery configuration.
+
+**Recovery from the earlier EC2 switch attempt:** that failure selected system-profile generation 2 even though generation 1 is still running and remains systemd-boot's default. Before testing the physical configuration, if the profile still points at the failed EC2 closure, restore its selection without activating anything:
+
+```sh
+readlink -f /nix/var/nix/profiles/system
+sudo nix-env --profile /nix/var/nix/profiles/system --switch-generation 1
+```
+
+This recovery command is specific to the observed generations on this machine; it is not a routine rebuild step.
+
+From an administrator shell:
+
+```sh
+cd /etc/nix
+nix --extra-experimental-features 'nix-command flakes' flake check --no-build --no-update-lock-file
+nix --extra-experimental-features 'nix-command flakes' build \
+  .#checks.x86_64-linux.physical-config \
+  .#checks.x86_64-linux.updates .#checks.x86_64-linux.desktop-config \
+  --no-update-lock-file --no-link
+nix --extra-experimental-features 'nix-command flakes' build \
+  .#nixosConfigurations.nixos.config.system.build.toplevel \
+  --no-update-lock-file --out-link result-nixos
+built=$(readlink -f result-nixos)
+sudo "$built/sw/bin/nixos-rebuild" dry-activate --no-reexec --store-path "$built"
+```
+
+Use **`result-nixos`**, not an old `result` pointing at the EC2 closure. The dry run must not remove `kbot`, SDDM, NetworkManager or the `/boot`, `/home`, `/nix` mounts. Existing services can still need a restart; keeping an account does not guarantee its current graphical session stays running.
+
+Save your work, then activate from a text console (`Ctrl-Alt-F3`, log in as `kbot`, or use root). Keep that console available during testing:
+
+```sh
+cd /etc/nix
+built=$(readlink -f result-nixos) # Re-establish this shell variable on the new console.
+# Activates users/services, but does NOT change the boot default. This is not a dry run.
+sudo "$built/sw/bin/nixos-rebuild" test --no-reexec --store-path "$built"
+# Choose a new password locally; mutable users preserve it across later rebuilds.
+sudo passwd dev
+```
+
+At SDDM, choose **dev → Hyprland (uwsm-managed)** to try the new desktop, or **kbot → Plasma** for the existing environment. Once satisfied, persist the exact tested closure:
+
+```sh
+sudo "$built/sw/bin/nixos-rebuild" switch --no-reexec --store-path "$built"
+```
+
+If testing fails, use the retained text console to restore the booted system without changing the boot default:
+
+```sh
+previous=$(readlink -f /run/booted-system)
+sudo "$previous/sw/bin/nixos-rebuild" test --no-reexec --store-path "$previous"
+```
+
+If a later boot fails, select the original generation in systemd-boot (hold Space during startup). Keep recovery generations; do not garbage-collect them during migration. A working `kbot` account cannot recover an unbootable kernel/filesystem by itself.
+
+### EC2 only
+
+As `dev`, from `/etc/nixos` on the EC2 host:
 
 ```sh
 nixfmt --check ./*.nix
@@ -93,9 +159,9 @@ Make focused changes, format/evaluate them, and commit regularly. Build and acti
 
 ## Updates and safety
 
-- `nixos-update.timer` checks daily with up to one hour of jitter. Only the stable Nixpkgs/Home Manager branches advance; Neovim's source stays fixed. The updater skips a dirty repository, builds in a detached worktree, records a tested commit and applies it without rebooting. It attempts rollback if activation fails and retains recovery generations. Inspect `journalctl -u nixos-update` or trigger it with `sudo systemctl start nixos-update`.
+- **EC2 only:** `nixos-update.timer` checks daily with up to one hour of jitter. Only the stable Nixpkgs/Home Manager branches advance; Neovim's source stays fixed. The updater skips a dirty repository, builds in a detached worktree, records a tested commit and applies it without rebooting. It attempts rollback if activation fails and retains recovery generations. Inspect `journalctl -u nixos-update` or trigger it with `sudo systemctl start nixos-update`.
 - For a manual input refresh: `nix flake update nixpkgs home-manager`, review `flake.lock`, then check/build. The exact resolved revisions and hashes remain committed.
-- Keep the EC2 module, sandboxing, signature verification and recovery access intact.
+- Keep the EC2 module on the EC2 target only. Preserve sandboxing, signature verification and each host's recovery access.
 - `system.stateVersion` and `home.stateVersion` are both `26.05`; these preserve compatibility, not package versions.
 - `test` activates changes too; it is not a dry run. Keep the original system generation.
 - Rollbacks do not restore mutable user/application data, lockfile updates, backups, or this Git working tree.

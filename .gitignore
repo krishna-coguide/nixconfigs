@@ -3,6 +3,10 @@
 /result-*
 /.direnv/
 
+# NixOS-generated files when the checkout lives at /etc/nix.
+/nix.conf
+/registry.json
+
 # Local secrets must never be imported into Nix or committed.
 /.env
 /.env.*

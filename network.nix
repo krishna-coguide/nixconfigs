@@ -1,10 +1,11 @@
-{ pkgs, ... }:
+{ lib, pkgs, ... }:
 
 {
   # Keep each host's existing interface/DHCP owner. On EC2 this is dhcpcd;
   # NixOS wires its resolvconf hook to resolved's compatibility interface.
   services.resolved = {
-    enable = true;
+    # Physical hosts can retain their existing DNS setup during migration.
+    enable = lib.mkDefault true;
     settings.Resolve = {
       LLMNR = false;
       MulticastDNS = false;
@@ -14,12 +15,17 @@
 
   programs.mtr.enable = true;
   environment.systemPackages = with pkgs; [
-    wireguard-tools
+    wireguard-tools # wg and wg-quick; no interfaces or credentials are configured.
+    openvpn
+    iperf3
+    nmap
+    traceroute
+    whois
     dnsutils
     tcpdump
     ethtool
     netcat-openbsd
     socat
   ];
-  # wg/wg-quick are available, but no invented peers, keys, routes or ports.
+  # Client tools only: no VPN services, peers, keys, routes or firewall ports.
 }
