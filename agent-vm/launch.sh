@@ -4,6 +4,7 @@ if [[ ${1:-} == --help ]]; then
   echo 'Usage: nix run .#agent -- [run | ssh [command ...] | url | stop]'
   echo 'Workspace = cwd. RW config/credentials/skills = DSH_HOME (default ~/.dsh)'
   echo 'Also shares DSH_AGENTS_HOME/skills (default ~/.agents/skills). RAM/CPU/network: flake.'
+  echo "Web UI tries $AGENT_WEB_PORT-$AGENT_WEB_PORT_END in order; url prints the selected port."
   exit 0
 fi
 [[ $EUID != 0 ]] || { echo 'Run as your normal host user, not sudo/root.' >&2; exit 1; }
@@ -26,13 +27,18 @@ ssh_cmd=(ssh -F /dev/null -i "$state/client-key" -p "$AGENT_SSH_PORT"
   -o StrictHostKeyChecking=yes -o HostKeyAlias=agent-vm -o ConnectTimeout=3
   -o "UserKnownHostsFile=$state/known_hosts" -o GlobalKnownHostsFile=/dev/null)
 remote="root@$AGENT_SSH_HOST"
+# Relative ControlPath avoids Unix-socket path limits with long state directories.
+web_control() { (cd "$state" && "${ssh_cmd[@]}" -S web.sock "$@" "$remote"); }
 url() {
-  local found address=$AGENT_WEB_BIND
+  local found port address=$AGENT_WEB_BIND
+  [[ -f $state/web-port ]] && read -r port < "$state/web-port" || return 1
+  [[ $port =~ ^[1-9][0-9]{0,4}$ ]] && (( port <= 65535 )) || return 1
+  web_control -O check >/dev/null 2>&1 || return 1
   [[ $address != 0.0.0.0 ]] || address=127.0.0.1
   found=$("${ssh_cmd[@]}" "$remote" 'journalctl -u agent -b -o cat --no-pager' |
     grep -oE 'http://127\.0\.0\.1:3080/\?token=[a-zA-Z0-9_%.-]+' | tail -1) || return 1
   [[ -n $found ]] || return 1
-  printf '%s\n' "${found/http:\/\/127.0.0.1:3080/http:\/\/$address:$AGENT_WEB_PORT}"
+  printf '%s\n' "${found/http:\/\/127.0.0.1:3080/http:\/\/$address:$port}"
 }
 # Expand cwd inside the guest, not on the host.
 # shellcheck disable=SC2016
@@ -52,6 +58,9 @@ for dir in "$state" "$dsh"; do
 done
 exec 9>"$state/run.lock"
 flock -n 9 || { echo 'This project VM is already running.' >&2; exit 1; }
+# Clean up only this project's stale forwarding state, after acquiring its lock.
+web_control -O exit >/dev/null 2>&1 || true
+rm -f "$state/web.sock" "$state/web-port"
 for key in client-key ssh-host-key; do
   [[ -f $state/$key ]] || ssh-keygen -q -t ed25519 -N '' -C agent-vm -f "$state/$key"
 done
@@ -63,15 +72,15 @@ if [[ $AGENT_WEB_BIND != 127.0.0.1 ]]; then
   echo 'WARNING: off-host Web access is plaintext HTTP. Use a VPN/TLS; never expose directly to the Internet.' >&2
 fi
 vm_pid=''
-tunnel_pid=''
 cleanup() {
   trap - EXIT INT TERM
+  web_control -O exit >/dev/null 2>&1 || true
+  rm -f "$state/web-port" "$state/web.sock"
   if [[ -n $vm_pid ]] && kill -0 "$vm_pid" 2>/dev/null; then
     (cd "$state"; timeout 30 "$AGENT_RUNNER/microvm-shutdown") >/dev/null 2>&1 || true
     kill "$vm_pid" 2>/dev/null || true
     wait "$vm_pid" 2>/dev/null || true
   fi
-  if [[ -n $tunnel_pid ]]; then kill "$tunnel_pid" 2>/dev/null || true; wait "$tunnel_pid" 2>/dev/null || true; fi
 }
 trap cleanup EXIT
 trap 'exit 130' INT
@@ -99,16 +108,28 @@ done
 $ready || { echo "SSH boot timeout; see $state/console.log" >&2; exit 1; }
 # DSH deliberately refuses --host 0.0.0.0. Keep its own authenticated browser
 # endpoint on guest loopback and publish an SSH forward on the chosen host IP.
-"${ssh_cmd[@]}" -N -g -o ExitOnForwardFailure=yes -o ServerAliveInterval=10 \
-  -o ServerAliveCountMax=3 -L "$AGENT_WEB_BIND:$AGENT_WEB_PORT:127.0.0.1:3080" \
-  "$remote" >>"$state/console.log" 2>&1 &
-tunnel_pid=$!
+web_control -M -fN -g -o ExitOnForwardFailure=yes -o ServerAliveInterval=10 \
+  -o ServerAliveCountMax=3 >>"$state/console.log" 2>&1 || {
+    echo "Cannot start Web SSH tunnel; see $state/console.log" >&2; exit 1;
+  }
+# Ask SSH to actually bind each port: no probe-then-bind race or extra port helper.
+for ((port=AGENT_WEB_PORT; port<=AGENT_WEB_PORT_END; port++)); do
+  if web_control -O forward -L "$AGENT_WEB_BIND:$port:127.0.0.1:3080" >>"$state/console.log" 2>&1; then
+    printf '%s\n' "$port" > "$state/web-port"
+    break
+  fi
+done
+[[ -f $state/web-port ]] || {
+  echo "No available Web UI port on $AGENT_WEB_BIND in $AGENT_WEB_PORT-$AGENT_WEB_PORT_END; see $state/console.log" >&2
+  exit 1
+}
+echo "Web UI selected host port $port."
 echo "Booted. DSH resolves npm @latest on startup; first launch may take a few minutes."
 echo 'Use another terminal: nix run .#agent -- url   (or: ssh / stop)'
 printed=false
 while kill -0 "$vm_pid" 2>/dev/null; do
   # Normal guest poweroff can close SSH slightly before QEMU exits.
-  if ! kill -0 "$tunnel_pid" 2>/dev/null; then
+  if ! web_control -O check >/dev/null 2>&1; then
     timeout 30 tail --pid="$vm_pid" -f /dev/null || true
     if kill -0 "$vm_pid" 2>/dev/null; then echo "Web tunnel exited; see $state/console.log" >&2; exit 1; fi
     break

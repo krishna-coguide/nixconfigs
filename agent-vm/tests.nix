@@ -16,8 +16,10 @@ let
         # Offline infrastructure test. A real DSH startup is tested separately;
         # @latest needs the network and is intentionally outside Nix reproducibility.
         agentVM.package = pkgs.writeShellScriptBin "dsh" ''
-          echo 'http://127.0.0.1:3080/?token=offline-test'
-          exec ${pkgs.coreutils}/bin/sleep infinity
+          exec ${pkgs.nodejs}/bin/node -e '
+            require("node:http").createServer((req, res) => res.end("agent-vm-test"))
+              .listen(3080, "127.0.0.1", () => console.log("http://127.0.0.1:3080/?token=offline-test"));
+          '
         '';
       }
     ];
@@ -35,15 +37,38 @@ let
           guestAddress = "192.168.77.2";
           gateway = "192.168.77.1";
           dns = [ "192.168.77.1" ];
+          hostAddress = "192.168.77.1";
+          webPort = 3090;
+          webPortEnd = 3092;
         };
       }
     ];
+  };
+  fixed = inputs.self.lib.mkAgentVM {
+    system = pkgs.stdenv.hostPlatform.system;
+    project.packages = [ ];
+    modules = [ { agentVM.network.webPort = 8080; } ];
   };
 in
 {
   config =
     assert c.microvm.mem == 4096;
     assert c.microvm.vcpu == 4;
+    assert c.agentVM.network.webPort == 3080;
+    assert c.agentVM.network.webPortEnd == 3100;
+    assert fixed.nixos.config.agentVM.network.webPortEnd == 8080;
+    assert builtins.all
+      (
+        port:
+        pkgs.lib.hasInfix "192.168.77.1:${toString port}" tap.nixos.config.systemd.services.agent.serviceConfig.ExecStart
+      )
+      [
+        3090
+        3091
+        3092
+      ];
+    assert
+      !(pkgs.lib.hasInfix "192.168.77.1:3093" tap.nixos.config.systemd.services.agent.serviceConfig.ExecStart);
     assert builtins.length c.microvm.shares == 3;
     assert builtins.all (s: !s.readOnly && s.securityModel == "none") c.microvm.shares;
     assert c.microvm.storeOnDisk;
@@ -74,7 +99,7 @@ in
         ];
       }
       ''
-        shellcheck -s bash ${./launch.sh} ${./boot-test.sh} ${./playwright-test.sh}
+        shellcheck -s bash ${./launch.sh} ${./boot-test.sh} ${./playwright-test.sh} ${./port-test.sh}
         bash -n ${./launch.sh}
         touch "$out"
       '';
@@ -93,6 +118,23 @@ in
       ''
         export PLAYWRIGHT_TEST_OUTPUT="$out"
         bash ${./playwright-test.sh}
+      '';
+
+  ports =
+    pkgs.runCommand "agent-vm-port-check"
+      {
+        requiredSystemFeatures = [ "kvm" ];
+        nativeBuildInputs = [
+          pkgs.bash
+          pkgs.coreutils
+          pkgs.gnugrep
+          pkgs.nodejs
+          pkgs.curl
+        ];
+      }
+      ''
+        bash ${./port-test.sh} ${testVM.package}/bin/agent-vm
+        touch "$out"
       '';
 
   boot =

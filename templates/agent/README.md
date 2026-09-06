@@ -11,6 +11,11 @@ nix run .#agent -- ssh        # root shell, starting in the same project cwd
 nix run .#agent -- stop
 ```
 
+The Web UI takes the first available port from **3080–3100**. The printed URL and
+`url` command use the selected port; a full range fails cleanly. Configure
+`agentVM.network.webPort` / `webPortEnd` to change the range (equal values mean a
+fixed port). Multiple VMs still need distinct `sshPort` settings.
+
 `$DSH_HOME` (default `~/.dsh`) and `${DSH_AGENTS_HOME:-~/.agents}/skills` are
 also mounted **read-write**. No other home directories or host sockets are shared.
 The first run creates missing DSH/skills directories. Existing DSH home must be

@@ -71,12 +71,18 @@ in
       webPort = mkOption {
         type = types.port;
         default = 3080;
-        description = "Host Web UI port; the guest DSH listener stays on 127.0.0.1:3080.";
+        description = "First host Web UI port to try; the guest listener stays on 127.0.0.1:3080.";
+      };
+      webPortEnd = mkOption {
+        type = types.port;
+        # Preserve fixed-port behavior for existing nondefault webPort settings.
+        default = if net.webPort == 3080 then 3100 else net.webPort;
+        description = "Last host Web UI port to try, inclusive. Set equal to webPort for a fixed port.";
       };
       trustedHosts = mkOption {
         type = types.listOf (types.strMatching "[a-zA-Z0-9.:-]+");
         default = [ ];
-        description = "Additional exact browser authorities for DSH's Host/Origin protection. Required for wildcard publication.";
+        description = "Additional host[:port] entries for DSH's Host/Origin protection. A port-less host matches any port. Required for wildcard publication.";
       };
       tapName = mkOption {
         type = types.strMatching "[a-zA-Z0-9_-]{1,15}";
@@ -119,8 +125,12 @@ in
         message = "agentVM TAP mode requires network.guestAddress, gateway and dns.";
       }
       {
-        assertion = net.webPort >= 1024 && net.sshPort >= 1024 && net.webPort != net.sshPort;
-        message = "Rootless Web/SSH listeners need distinct unprivileged ports (>=1024).";
+        assertion =
+          net.webPort >= 1024
+          && net.webPortEnd >= net.webPort
+          && net.sshPort >= 1024
+          && (net.sshPort < net.webPort || net.sshPort > net.webPortEnd);
+        message = "Use an ordered, unprivileged Web port range and an unprivileged SSH port outside that range.";
       }
       {
         assertion = net.hostAddress != "0.0.0.0" || net.trustedHosts != [ ];
@@ -369,12 +379,12 @@ in
               ])
               (
                 net.trustedHosts
-                ++ lib.optional (
+                ++ lib.optionals (
                   !builtins.elem net.hostAddress [
                     "127.0.0.1"
                     "0.0.0.0"
                   ]
-                ) "${net.hostAddress}:${toString net.webPort}"
+                ) (map (port: "${net.hostAddress}:${toString port}") (lib.range net.webPort net.webPortEnd))
               )
         );
         Restart = "on-failure";

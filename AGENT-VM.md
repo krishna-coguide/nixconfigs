@@ -179,7 +179,13 @@ replacing local instructions. This does not restart an already-running VM.
 
 DSH intentionally rejects `dsh web --host 0.0.0.0`. We don't patch around its
 browser protections: it listens on **guest `127.0.0.1:3080`**, and the shell launcher
-publishes an **SSH local forward** on your chosen **host** IPv4 address/port.
+publishes an **SSH local forward** on your chosen **host** IPv4 address. By default
+it tries **3080 through 3100, in ascending order**, and keeps the first port SSH
+successfully binds. There is no separate free-port probe that could race another
+process. The printed login URL and `nix run .#agent -- url` use the chosen port,
+recorded in the project's private runtime state. Each new launch starts at 3080
+again; shutdown clears the selection. If the range is full, launch fails clearly
+and cleans up its VM/tunnel instead of leaving an inaccessible instance running.
 DSH's random launch-token → signed-cookie authentication and Host/Origin checks
 remain in use. Only SSH is forwarded by QEMU, always on host loopback.
 
@@ -187,22 +193,31 @@ remain in use. Only SSH is forwarded by QEMU, always on host loopback.
 agentVM.network = {
   hostAddress = "127.0.0.1"; # default: this computer only
   sshPort = 2222;
-  webPort = 3080;
+  webPort = 3080;     # First candidate.
+  webPortEnd = 3100;  # Last candidate, inclusive.
 };
 ```
 
+Set both values to the same port for a fixed listener. For compatibility, setting
+only a nondefault `webPort` still means that single fixed port; give `webPortEnd`
+explicitly to select a different range. Keep the SSH port outside the Web range.
+
 - **One LAN/VPN interface:** set `hostAddress = "192.168.1.20"` (an IP actually
-  assigned to this host). Its browser authority is automatically trusted.
+  assigned to this host). Its exact authorities across the configured port range
+  are automatically trusted.
 - **All IPv4 interfaces:** set `hostAddress = "0.0.0.0"` and
-  `trustedHosts = [ "192.168.1.20:3080" "laptop.example:3080" ];`.
+  `trustedHosts = [ "192.168.1.20" "laptop.example" ];`. Port-less entries accept
+  that exact host on any port; an explicit `host:port` accepts only that port.
   Use a real address, not `0.0.0.0`, in your browser. The printed local URL can
   have its host replaced with one of those authorities. This includes public
   interfaces too; it is not shorthand for “LAN only.”
-- Multiple project VMs need distinct host SSH/Web ports.
+- Multiple project VMs still need distinct **SSH** ports. Web ports are selected
+  automatically from the range; SSH port selection is unchanged.
 - Binding a host IP controls the **incoming listener**, not outgoing routing or
   which NIC reaches DeepSeek. Outgoing traffic follows host routes/VPN policy.
-- No host firewall is changed. For LAN access, explicitly allow only the Web port
-  on the intended host interface in your firewall. Do not open the SSH forward.
+- No host firewall is changed. For LAN access, explicitly allow the selected Web
+  port (or intended Web range) on the intended host interface. Do not open the SSH
+  forward. Use a fixed port if a reverse proxy needs a stable upstream.
 
 **Use a VPN or a TLS reverse proxy for off-host access.** The forward is encrypted
 between host and guest, but browser → host remains HTTP. A token/cookie on an
@@ -337,9 +352,11 @@ nix build path:/etc/nix/agent-vm#checks.x86_64-linux.config \
   path:/etc/nix/agent-vm#checks.x86_64-linux.playwright --no-link
 # Actual offline microVM boot/mount/SSH/browser test, with a fake harness (no API calls):
 nix build path:/etc/nix/agent-vm#checks.x86_64-linux.boot --no-link
+# Real port contention, range exhaustion and remembered-URL checks:
+nix build path:/etc/nix/agent-vm#checks.x86_64-linux.ports --no-link
 ```
 
-The boot test requires KVM and nested user namespaces in the Nix build sandbox.
+The boot and port tests require KVM and nested user namespaces in the Nix build sandbox.
 The Playwright check launches two real Firefox instances concurrently against a
 local HTTP fixture, checks headless/default browser selection, separate cookies,
 DOM and localStorage, screenshots, close-one/keep-one behavior and profile expiry.

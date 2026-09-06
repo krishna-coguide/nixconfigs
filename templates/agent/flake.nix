@@ -24,9 +24,11 @@
             agentVM.network = {
               hostAddress = "127.0.0.1"; # Or a host LAN/VPN IPv4 address, or 0.0.0.0.
               sshPort = 2222; # Always host localhost in user-network mode.
-              webPort = 3080;
-              # For 0.0.0.0, list the actual browser authorities, not a wildcard:
-              # trustedHosts = [ "192.168.1.20:3080" ];
+              webPort = 3080; # First available host Web port in this inclusive range.
+              webPortEnd = 3100; # Set equal to webPort to disable port hopping.
+              # For 0.0.0.0, list actual browser hosts, not a wildcard.
+              # A port-less host allows any selected port; host:port stays exact.
+              # trustedHosts = [ "192.168.1.20" ];
             };
           }
         ];

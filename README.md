@@ -121,8 +121,8 @@ git credential-cache exit
 [AGENT-VM.md](AGENT-VM.md) documents the project template and `nix run .#agent`.
 The official `dsh@latest` runs as root in a rootless microVM, with the current
 project and your standard DSH home/shared skills mounted **read-write**. Its
-host Web listener defaults to localhost; RAM, vCPUs, IPs and optional TAP
-networking are configured through Nix modules. The VM is headless by default and
+host Web listener defaults to localhost on the first free port in **3080–3100**;
+RAM, vCPUs, IPs and optional TAP networking are configured through Nix modules. The VM is headless by default and
 includes **Playwright CLI + matching Firefox**, with a writable, once-seeded
 `playwright-firefox` skill for isolated named sessions across subagents. No host
 service is activated.

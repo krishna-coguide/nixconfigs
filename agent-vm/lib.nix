@@ -35,6 +35,7 @@ let
       AGENT_NETWORK = net.mode;
       AGENT_WEB_BIND = net.hostAddress;
       AGENT_WEB_PORT = toString net.webPort;
+      AGENT_WEB_PORT_END = toString net.webPortEnd;
       AGENT_SSH_HOST = if net.mode == "user" then "127.0.0.1" else net.guestAddress;
       AGENT_SSH_PORT = toString (if net.mode == "user" then net.sshPort else 22);
     };
