@@ -90,6 +90,20 @@ These are system-owned executables from Nix, not unmanaged `npm -g`, `pip instal
 
 ## Build and apply
 
+### One-command sync on this laptop
+
+Save your work, then run from any directory (it requests sudo when needed):
+
+```sh
+/etc/nix/switch-system.sh               # apply now and make it the boot default
+/etc/nix/switch-system.sh dry-activate  # build and preview changes without applying
+/etc/nix/switch-system.sh boot          # stage for the next boot instead
+```
+
+This builds the current **`/etc/nix#nixos`** checkout and activates that exact output, including `dev`'s Home Manager configuration. It shares the automatic updater's lock, stops on build failure, keeps recovery generations and never reboots. It does **not** pull remote Git changes or update `flake.lock`: “latest” here means the files currently checked out in `/etc/nix`. New source files must be added to Git to be included. Open a new terminal afterward for shell environment changes; some desktop changes require a fresh login. `--help` lists the modes, including temporary `test` activation.
+
+### Detailed validation and activation
+
 On the **physical laptop**, from an administrator shell:
 
 ```sh
