@@ -20,7 +20,7 @@ Flat, explicit NixOS modules with locked inputs. Required setup belongs here—n
 | `neovim.nix`, `neovim-test.lua` | Unmodified upstream editor deployment and opt-in native runtime audit |
 | `updates.nix`, `update-system.sh`, `update-test.py` | Shared dev-owned checkouts, daily boot-staged updates and failure/concurrency regression tests |
 | `switch-system.sh`, `switch-test.py` | Same installed manual apply/preview command on both hosts, with host identity supplied by Nix |
-| `physical-test.nix`, `tools-test.nix` | Physical/AWS safety, shared-policy assertions and bounded offline tool/help smoke tests |
+| `physical-test.nix`, `tools-test.nix`, `git-credentials-test.nix` | Physical/AWS safety, shared-policy assertions, offline tool/help smoke tests and disposable Git credential-cache checks |
 | `desktop-test.nix`, `desktop-test.py`, `audit-desktop.sh` | Disposable graphical/PAM/audio/scaling audit |
 | `workstation.nix`, `nvidia.nix` | Shared local hardware/SDDM integration for laptop and VM; separate opt-in NVIDIA support |
 | [DESKTOP.md](DESKTOP.md) | Live audit, wallpaper provenance, JaKooLit comparison and explicit feature-completion plan |
@@ -90,6 +90,28 @@ See [DESKTOP.md](DESKTOP.md) for the screenshot-led audit, functional coverage, 
 - **Networking (`network.nix`):** WireGuard/OpenVPN, NetworkManager VPN integration on the laptop, mtr, iperf3, nmap (including ncat/nping), tcpdump/tshark, doggo/dig, ldns/drill, fping, iftop/bandwhich, traceroute, whois, ethtool, netcat, socat, torsocks and proxychains-ng. Tor runs as a local client service (below). No tunnels, peers, credentials, extra capture privileges or opened firewall ports.
 
 These are system-owned executables from Nix, not unmanaged `npm -g`, `pip install --user` or `cargo install` bootstraps. Project dependencies may still be downloaded by their ordinary package managers. `nix develop` / `.envrc` remain appropriate for project-specific versions; this is not a promise that every language project uses the same global toolchain.
+
+### Git credentials: terminal, not a GUI
+
+Git HTTPS authentication uses terminal username/token prompts and Git's native
+**in-memory cache with a 365-day timeout** (`31536000` seconds). Inherited helpers
+are reset, and Git/SSH graphical askpass fallback is disabled for normal terminal
+Git invocations. No credential-manager GUI or plaintext `credential-store` is used.
+Credentials are scoped to the repository path as well as the host.
+
+This is cache retention, **not a new token expiry**: rebooting, stopping the cache
+daemon or rejecting a credential clears it, and the provider can expire/revoke a
+token sooner. A successful re-approval refreshes its cache timeout. Choose a
+one-year token expiry at your Git provider if it supports it; no real credentials
+or provider settings are changed by this configuration. SSH keys/agents and
+KeePassXC's storage for other applications remain unchanged. IDEs or repositories
+that explicitly override Git helpers/askpass can override these user defaults.
+
+To forget all cached Git HTTPS credentials immediately:
+
+```sh
+git credential-cache exit
+```
 
 ### Per-project DeepSeek Harness
 

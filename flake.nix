@@ -63,6 +63,10 @@
         in
         {
           desktop = import ./desktop-test.nix { inherit inputs pkgs; };
+          git-credentials = import ./git-credentials-test.nix {
+            inherit pkgs;
+            config = inputs.self.nixosConfigurations.nixos.config;
+          };
           tools = import ./tools-test.nix {
             inherit pkgs;
             config = inputs.self.nixosConfigurations.nixos.config;

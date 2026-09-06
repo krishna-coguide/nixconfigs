@@ -235,7 +235,22 @@ in
     programs.git = {
       enable = true;
       package = null; # The system module supplies Git.
-      settings.user.useConfigOnly = true;
+      settings = {
+        user.useConfigOnly = true;
+        core.askPass = ""; # Use /dev/tty, never fall back to SSH's GUI askpass.
+        credential = {
+          # Reset inherited helpers; keep secrets in memory, never plaintext files.
+          helper = [
+            ""
+            "cache --timeout=31536000"
+          ]; # 365 days; cleared on reboot.
+          useHttpPath = true; # Don't reuse a repository token for unrelated paths.
+        };
+      };
+    };
+    home.sessionVariables = {
+      GIT_ASKPASS = "";
+      GIT_TERMINAL_PROMPT = "1";
     };
 
     programs.delta = {
