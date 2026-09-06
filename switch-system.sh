@@ -45,7 +45,6 @@ if ((EUID == 0)); then
   exec runuser -u dev -- env NIXOS_CONFIG_REPO="$repo" NIXOS_UPDATE_HOST="$host" \
     "$(readlink -f -- "${BASH_SOURCE[0]}")" "$@"
 fi
-sudo -v
 
 # Share the automatic updater's lock. Directory ownership is managed by NixOS.
 state=${CACHE_DIRECTORY:-/var/cache/nixos-update}

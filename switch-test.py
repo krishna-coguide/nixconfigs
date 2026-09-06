@@ -15,7 +15,7 @@ name = pathlib.Path(sys.argv[0]).name
 args = sys.argv[1:]
 with open(os.environ["CALLS"], "a") as f:
     f.write(json.dumps([name, *args]) + "\n")
-if name == "nix" or (name == "sudo" and args != ["-v"]):
+if name in ("nix", "sudo"):
     # Model sudo's descriptor cleanup: the parent shell must retain the lock.
     try: os.close(9)
     except OSError: pass
@@ -29,12 +29,12 @@ if name == "nix":
     if os.environ["SCENARIO"] == "build-failure": sys.exit(42)
     print(os.environ["BUILT"])
 elif name == "sudo":
-    if args == ["-v"]:
-        if os.environ["SCENARIO"] == "sudo-failure": sys.exit(43)
-    else:
-        assert args[0] == os.environ["BUILT"] + "/sw/bin/nixos-rebuild"
-        assert args[2:] == ["--no-reexec", "--store-path", os.environ["BUILT"]]
-        if os.environ["SCENARIO"] == "activation-failure": sys.exit(44)
+    # No sudo -v: its verifypw=all policy can demand a password even when
+    # the actual command is NOPASSWD (the user also has a wheel rule).
+    assert args[0] == os.environ["BUILT"] + "/sw/bin/nixos-rebuild"
+    assert args[2:] == ["--no-reexec", "--store-path", os.environ["BUILT"]]
+    if os.environ["SCENARIO"] == "sudo-failure": sys.exit(43)
+    if os.environ["SCENARIO"] == "activation-failure": sys.exit(44)
 else:
     raise AssertionError(name)
 '''
@@ -57,7 +57,7 @@ with tempfile.TemporaryDirectory(prefix="switch-test-") as directory:
              (["boot"], "boot", "success", 0), (["test"], "test", "success", 0),
              (["--help"], None, "help", 0), (["invalid"], None, "invalid", 2),
              (["switch", "extra"], None, "invalid", 2),
-             ([], None, "build-failure", 42), ([], None, "sudo-failure", 43),
+             ([], None, "build-failure", 42), ([], "switch", "sudo-failure", 43),
              ([], "switch", "activation-failure", 44), ([], None, "invalid-host", 2)]
     for host in ["nixos", "dev"]:
         for args, action, scenario, expected_code in cases:
@@ -70,13 +70,10 @@ with tempfile.TemporaryDirectory(prefix="switch-test-") as directory:
             assert result.returncode == expected_code, (host, scenario, result.stdout, result.stderr)
             log = [json.loads(line) for line in calls.read_text().splitlines()] if calls.exists() else []
             if action:
-                assert len(log) == 3, log
-                assert log[0] == ["sudo", "-v"], log
+                assert [call[0] for call in log] == ["nix", "sudo"], log
                 assert log[-1][2] == action, log
             elif scenario == "build-failure":
-                assert [call[0] for call in log] == ["sudo", "nix"], log
-            elif scenario == "sudo-failure":
-                assert log == [["sudo", "-v"]], log
+                assert [call[0] for call in log] == ["nix"], log
             else:
                 assert not log, log
             print("PASS", host, args or ["default"], scenario)
