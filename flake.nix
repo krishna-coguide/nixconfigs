@@ -2,15 +2,15 @@
   description = "Development host";
 
   inputs = {
-    # Release branches may advance; flake.lock records every exact snapshot.
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
+    # Rolling, latest-tested NixOS; flake.lock records the resolved snapshot.
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     home-manager = {
-      url = "github:nix-community/home-manager/release-26.05";
+      url = "github:nix-community/home-manager/master";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Fast-moving developer tools can lag behind stable release branches.
+    # Fast-moving developer tools can advance ahead of the tested channel.
     # flake.lock still records the exact resolved snapshot.
     nixpkgs-latest.url = "github:NixOS/nixpkgs/master";
 

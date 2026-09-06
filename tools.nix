@@ -306,14 +306,14 @@ in
       enableZshIntegration = true;
       package = latest.fzf;
       defaultCommand = "fd --type f --hidden --exclude .git";
-      fileWidgetCommand = "fd --type f --hidden --exclude .git";
-      changeDirWidgetCommand = "fd --type d --hidden --exclude .git";
+      fileWidget.command = "fd --type f --hidden --exclude .git";
+      changeDirWidget.command = "fd --type d --hidden --exclude .git";
       defaultOptions = [
         "--height=45%"
         "--layout=reverse"
         "--border=rounded"
       ];
-      fileWidgetOptions = [ "--preview 'bat --color=always --line-range=:200 -- {}'" ];
+      fileWidget.options = [ "--preview 'bat --color=always --line-range=:200 -- {}'" ];
       colors = {
         bg = c.background;
         fg = c.text;
