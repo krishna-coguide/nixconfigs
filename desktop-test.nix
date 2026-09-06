@@ -15,15 +15,15 @@ pkgs.testers.runNixOSTest {
   nodes.machine = { pkgs, ... }: {
     imports = [
       inputs.home-manager.nixosModules.home-manager
-      ./users.nix
-      ./tools.nix
-      ./network.nix
-      ./neovim.nix
-      ./desktop.nix
-      ./apps.nix
+      ./common.nix
       ./workstation.nix
     ];
-    system.stateVersion = "26.05";
+    # Exercise the shared host policy, but never run automatic updates in a VM.
+    systemd.services.nixos-update.environment = {
+      NIXOS_CONFIG_REPO = "/etc/nix";
+      NIXOS_UPDATE_HOST = "nixos";
+    };
+    systemd.timers.nixos-update.enable = false;
     boot.blacklistedKernelModules = [ "floppy" ];
     virtualisation = {
       memorySize = 6144;
@@ -58,9 +58,10 @@ pkgs.testers.runNixOSTest {
         mkpasswd --method=sha-512 --salt=nixostest desktop-test > "$out"
       ''
     );
-    services.greetd.settings.initial_session = {
+    # The same SDDM/UWSM session as the laptop; autologin is test-only.
+    services.displayManager.autoLogin = {
+      enable = true;
       user = "dev";
-      command = "${pkgs.uwsm}/bin/uwsm start -e -D Hyprland hyprland.desktop";
     };
   };
   testScript = builtins.readFile ./desktop-test.py;

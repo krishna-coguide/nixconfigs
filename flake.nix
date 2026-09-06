@@ -22,22 +22,21 @@
 
   outputs =
     inputs@{ nixpkgs, home-manager, ... }:
+    let
+      mkHost =
+        module:
+        nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs; };
+          modules = [
+            module
+            home-manager.nixosModules.home-manager
+          ];
+        };
+    in
     {
-      nixosConfigurations.dev = nixpkgs.lib.nixosSystem {
-        specialArgs = { inherit inputs; };
-        modules = [
-          ./configuration.nix
-          home-manager.nixosModules.home-manager
-        ];
-      };
-
-      # Physical laptop: dev + managed Hyprland; preserve its boot/storage.
-      nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
-        specialArgs = { inherit inputs; };
-        modules = [
-          ./physical.nix
-          home-manager.nixosModules.home-manager
-        ];
+      nixosConfigurations = {
+        dev = mkHost ./configuration.nix; # EC2 integration
+        nixos = mkHost ./physical.nix; # This laptop's boot/storage/hardware
       };
 
       formatter.x86_64-linux = nixpkgs.legacyPackages.x86_64-linux.nixfmt;
@@ -66,7 +65,24 @@
           physical-config = import ./physical-test.nix {
             inherit pkgs;
             config = inputs.self.nixosConfigurations.nixos.config;
+            ec2Config = inputs.self.nixosConfigurations.dev.config;
           };
+          switch-system =
+            pkgs.runCommand "switch-system-check"
+              {
+                nativeBuildInputs = with pkgs; [
+                  python3
+                  bash
+                  coreutils
+                  util-linux
+                  shellcheck
+                ];
+              }
+              ''
+                shellcheck ${./switch-system.sh}
+                python ${./switch-test.py} ${./switch-system.sh}
+                touch "$out"
+              '';
           desktop-actions =
             pkgs.runCommand "desktop-actions-check" { nativeBuildInputs = [ pkgs.python3 ]; }
               ''

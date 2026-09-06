@@ -1,4 +1,5 @@
 {
+  config,
   inputs,
   lib,
   pkgs,
@@ -11,11 +12,10 @@ let
   };
 in
 {
-  # Keep each host's existing interface/DHCP owner. On EC2 this is dhcpcd;
-  # NixOS wires its resolvconf hook to resolved's compatibility interface.
+  # NetworkManager owns local DNS on workstations. With dhcpcd (EC2),
+  # NixOS wires resolvconf to resolved. Preserve both hosts' existing behavior.
   services.resolved = {
-    # Physical hosts can retain their existing DNS setup during migration.
-    enable = lib.mkDefault true;
+    enable = lib.mkDefault (!config.networking.networkmanager.enable);
     settings.Resolve = {
       LLMNR = false;
       MulticastDNS = false;

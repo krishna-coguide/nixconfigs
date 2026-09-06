@@ -37,18 +37,17 @@ elif name == "sudo":
     if scenario == "dry-activation-failure" and args[1] == "dry-activate": sys.exit(44)
     if scenario == "concurrent-dry-edit" and args[1] == "dry-activate":
         (pathlib.Path(os.environ["NIXOS_CONFIG_REPO"]) / "notes").write_text("user work\n")
-    if scenario in ("activation-failure", "rollback-failure") and args[1] == os.environ["NIXOS_UPDATE_MODE"]:
+    if scenario in ("activation-failure", "rollback-failure") and args[1] == "boot":
         if args[-1] == os.environ["BUILT"] or scenario == "rollback-failure": sys.exit(45)
 elif name == "readlink":
-    previous = "/nix/var/nix/profiles/system" if os.environ["NIXOS_UPDATE_MODE"] == "boot" else "/run/current-system"
-    assert args == ["-f", previous]
+    assert args == ["-f", "/nix/var/nix/profiles/system"]
     print(os.environ["PREVIOUS"])
 else:
     raise AssertionError(name)
 '''
 
 
-def run_case(scenario, host="dev", mode="switch"):
+def run_case(scenario, host="dev"):
     with tempfile.TemporaryDirectory(prefix="update-test-") as directory:
         root = Path(directory)
         repo = root / "repo with spaces"
@@ -59,7 +58,7 @@ def run_case(scenario, host="dev", mode="switch"):
         calls_path = root / "calls.jsonl"
         env = dict(os.environ, HOME=str(root / "home"), CACHE_DIRECTORY=str(cache),
                    NIXOS_CONFIG_REPO=str(repo), NIXOS_UPDATE_HOST=host,
-                   NIXOS_UPDATE_MODE=mode, SCENARIO=scenario,
+                   SCENARIO=scenario,
                    CALLS=str(calls_path), BUILT=str(root / "candidate-system"),
                    PREVIOUS=str(root / "previous-system"),
                    GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_SYSTEM="/dev/null")
@@ -94,21 +93,22 @@ def run_case(scenario, host="dev", mode="switch"):
         sudo = [call for call in calls if call[0] == "sudo"]
         failed = scenario.endswith("failure") or scenario == "invalid-host"
         assert (result.returncode != 0) == failed, (scenario, result.stdout)
+        assert all(call[2] in ("dry-activate", "boot") for call in sudo), calls
         if scenario == "success":
             assert json.loads((repo / "flake.lock").read_text())["revision"] == 2
             assert git("log", "-1", "--format=%an <%ae>") == "NixOS Updater <nixos-updater@localhost>"
-            assert [call[2] for call in sudo] == ["dry-activate", mode]
+            assert [call[2] for call in sudo] == ["dry-activate", "boot"]
             assert (cache / "last-success").is_file()
             assert git("status", "--porcelain") == ""
         elif scenario == "activation-failure":
             assert json.loads((repo / "flake.lock").read_text())["revision"] == 1
-            assert [call[2] for call in sudo] == ["dry-activate", mode, mode]
+            assert [call[2] for call in sudo] == ["dry-activate", "boot", "boot"]
             assert sudo[-1][-1] != env["BUILT"]
             assert git("log", "-1", "--format=%s").startswith("Revert")
         elif scenario == "rollback-failure":
             # Keep the candidate commit for recovery, never claim rollback worked.
             assert json.loads((repo / "flake.lock").read_text())["revision"] == 2
-            assert [call[2] for call in sudo] == ["dry-activate", mode, mode]
+            assert [call[2] for call in sudo] == ["dry-activate", "boot", "boot"]
             assert not (cache / "last-success").exists()
         else:
             assert git("rev-parse", "HEAD") == baseline, (scenario, result.stdout)
@@ -120,12 +120,12 @@ def run_case(scenario, host="dev", mode="switch"):
             assert (repo / "notes").read_text() == "user work\n"
         if scenario in ("dirty", "detached", "invalid-host"):
             assert not calls
-        print("PASS", host, mode, scenario)
+        print("PASS", host, "boot", scenario)
 
 
-for host, mode in [("dev", "switch"), ("nixos", "boot")]:
+for host in ["dev", "nixos"]:
     for scenario in ["dirty", "detached", "unchanged", "evaluation-failure", "build-failure",
                      "concurrent-edit", "concurrent-dry-edit", "dry-activation-failure",
                      "activation-failure", "rollback-failure", "success"]:
-        run_case(scenario, host, mode)
-run_case("invalid-host", "nixos", "switch")
+        run_case(scenario, host)
+run_case("invalid-host", "not-a-host")

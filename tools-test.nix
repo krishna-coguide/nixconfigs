@@ -20,11 +20,13 @@ pkgs.runCommand "workstation-tools-check"
       valgrind heaptrack rr eu-readelf bpftrace java javac mvn gradle kotlin \
       dotnet ruby bundle php composer zig zls elixir erl protoc buf \
       dprint stylua taplo marksman markdownlint-cli2 sqlfluff hadolint ast-grep rga \
-      hurl oha step mkcert cosign syft grype mosh sshfs asciinema vhs; do
+      hurl oha step mkcert cosign syft grype mosh sshfs asciinema vhs switch-system; do
       command -v "$tool" >/dev/null
     done
     test -x ${config.home-manager.users.dev.programs.lazygit.package}/bin/lazygit
     test -x ${config.home-manager.users.dev.programs.tmux.package}/bin/tmux
+    switch-system --help > "$TMPDIR/switch-help"
+    grep -Fq '/etc/nix#nixos' "$TMPDIR/switch-help"
     pi --version
     uv --version
     ruff --version

@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
-# Apply this laptop's checkout, never the separate EC2 "dev" configuration.
+# The installed command gets its host/path from updates.nix on both machines.
+# Direct execution from this checkout defaults to the laptop, never the login name.
 set -euo pipefail
+repo=${NIXOS_CONFIG_REPO:-/etc/nix}
+host=${NIXOS_UPDATE_HOST:-nixos}
 
 usage() {
   printf 'Usage: %s [switch|dry-activate|boot|test]\n' "$0"
+  printf 'Build %s#%s using flake.lock.\n' "$repo" "$host"
   printf '%s\n' \
-    'Build /etc/nix#nixos using flake.lock; default: switch now and save for boot.' \
+    'Default: switch now and save for boot (an explicit manual action).' \
     'dry-activate previews changes; boot stages them; test applies temporarily.' \
     'Does not pull Git, update package pins, delete generations, or reboot.'
 }
@@ -27,18 +31,31 @@ case "$action" in
     ;;
 esac
 
-if ((EUID != 0)); then
-  exec sudo -- "$(readlink -f -- "${BASH_SOURCE[0]}")" "$@"
-fi
+case "$host" in
+  nixos | dev) ;;
+  *)
+    printf 'Unsupported host: %s\n' "$host" >&2
+    exit 2
+    ;;
+esac
 
-# Share the existing updater's lock so it cannot change the checkout/profile
-# underneath this build and activation.
-mkdir -p /var/cache/nixos-update
-exec 9>/var/cache/nixos-update/lock
+# Keep builds/Git access under the checkout owner, including when invoked via sudo.
+# Only activating the built system needs root.
+if ((EUID == 0)); then
+  exec runuser -u dev -- env NIXOS_CONFIG_REPO="$repo" NIXOS_UPDATE_HOST="$host" \
+    "$(readlink -f -- "${BASH_SOURCE[0]}")" "$@"
+fi
+sudo -v
+
+# Share the automatic updater's lock. Directory ownership is managed by NixOS.
+state=${CACHE_DIRECTORY:-/var/cache/nixos-update}
+mkdir -p "$state"
+exec 9>"$state/lock"
 flock 9
 
-cd /etc/nix
-printf 'Building the current /etc/nix checkout for nixos (%s).\n' "$action"
-built=$(nix build .#nixosConfigurations.nixos.config.system.build.toplevel \
+cd "$repo"
+printf 'Building %s#%s (%s).\n' "$repo" "$host" "$action"
+built=$(nix build ".#nixosConfigurations.$host.config.system.build.toplevel" \
   --no-update-lock-file --no-link --print-out-paths)
-exec "$built/sw/bin/nixos-rebuild" "$action" --no-reexec --store-path "$built"
+# Keep this shell alive holding the lock: sudo closes inherited descriptors.
+sudo "$built/sw/bin/nixos-rebuild" "$action" --no-reexec --store-path "$built"

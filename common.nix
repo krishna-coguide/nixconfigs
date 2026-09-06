@@ -1,4 +1,4 @@
-# Shared dev environment; boot, storage, recovery users and updates are host-specific.
+# Shared user environment and update policy; only machine integration differs.
 { config, inputs, ... }:
 {
   imports = [
@@ -8,7 +8,15 @@
     ./desktop.nix
     ./apps.nix
     ./neovim.nix
+    ./updates.nix
   ];
+
+  time.timeZone = "America/Chicago";
+  i18n.defaultLocale = "en_US.UTF-8";
+  services.xserver.xkb = {
+    layout = "us";
+    variant = "";
+  };
 
   nixpkgs.hostPlatform = "x86_64-linux";
   # tools.nix/network.nix select current standalone CLIs without overriding the

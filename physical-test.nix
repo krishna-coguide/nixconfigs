@@ -1,5 +1,9 @@
-# Host configuration and built-file checks: no activation, VM or VPN connections.
-{ config, pkgs }:
+# Physical safety, shared host policy and built files; no activation/connections.
+{
+  config,
+  ec2Config,
+  pkgs,
+}:
 let
   inherit (pkgs) lib;
   dev = config.users.users.dev;
@@ -90,12 +94,54 @@ let
       assertion =
         config.systemd.services.nixos-update.environment.NIXOS_UPDATE_HOST == "nixos"
         && config.systemd.services.nixos-update.environment.NIXOS_CONFIG_REPO == "/etc/nix"
-        && config.systemd.services.nixos-update.environment.NIXOS_UPDATE_MODE == "boot"
-        && config.systemd.services.nixos-update.serviceConfig.User == "root"
+        && config.systemd.services.nixos-update.serviceConfig.User == "dev"
+        && builtins.elem "Z /etc/nix - dev users -" config.systemd.tmpfiles.rules
         && config.systemd.timers.nixos-update.timerConfig.Persistent
         && !(config.systemd.services ? amazon-ssm-agent)
         && !(builtins.elem "Z /etc/nixos - dev users -" config.systemd.tmpfiles.rules);
-      message = "Physical updates must stage the physical target, never EC2 or live-session restarts.";
+      message = "The laptop must keep its own checkout/target, not EC2's deployment settings.";
+    }
+    {
+      assertion =
+        lib.all
+          (
+            c:
+            let
+              update = c.systemd.services.nixos-update;
+            in
+            update.serviceConfig.User == "dev"
+            && update.serviceConfig.Group == "users"
+            && update.serviceConfig.ExecStart == config.systemd.services.nixos-update.serviceConfig.ExecStart
+            && c.systemd.timers.nixos-update.timerConfig == config.systemd.timers.nixos-update.timerConfig
+            && !(update.environment ? NIXOS_UPDATE_MODE)
+            && builtins.elem "Z ${update.environment.NIXOS_CONFIG_REPO} - dev users -" c.systemd.tmpfiles.rules
+            && builtins.elem "Z /var/cache/nixos-update - dev users -" c.systemd.tmpfiles.rules
+            && c.users.mutableUsers
+            && c.time.timeZone == "America/Chicago"
+            && c.i18n.defaultLocale == "en_US.UTF-8"
+          )
+          [
+            config
+            ec2Config
+          ];
+      message = "Both hosts must share the dev-owned checkout/updater and user preferences; no per-host activation policy.";
+    }
+    {
+      assertion =
+        ec2Config.systemd.services.nixos-update.environment.NIXOS_UPDATE_HOST == "dev"
+        && ec2Config.systemd.services.nixos-update.environment.NIXOS_CONFIG_REPO == "/etc/nixos"
+        && ec2Config.boot.loader.grub.enable
+        && ec2Config.boot.loader.grub.device == "/dev/xvda"
+        && !ec2Config.boot.loader.systemd-boot.enable
+        && ec2Config.fileSystems."/".device == "/dev/disk/by-label/nixos"
+        && ec2Config.fileSystems."/".fsType == "ext4"
+        && ec2Config.services.openssh.enable
+        && ec2Config.services.amazon-ssm-agent.enable
+        && ec2Config.networking.dhcpcd.enable
+        && ec2Config.services.resolved.enable
+        && !ec2Config.networking.networkmanager.enable
+        && !ec2Config.services.displayManager.sddm.enable;
+      message = "EC2 must retain its AWS boot, disks, networking and remote recovery, not laptop hardware services.";
     }
     {
       assertion =

@@ -5,9 +5,11 @@
     # Keep the image's EC2 boot, storage, metadata, SSH and SSM integration.
     "${modulesPath}/virtualisation/amazon-image.nix"
     ./common.nix
-    ./updates.nix
   ];
 
-  # Only the EC2 host keeps its dev-owned configuration checkout here.
-  systemd.tmpfiles.rules = [ "Z /etc/nixos - dev users -" ];
+  # Keep the existing deployment path; ownership/update policy is shared.
+  systemd.services.nixos-update.environment = {
+    NIXOS_CONFIG_REPO = "/etc/nixos";
+    NIXOS_UPDATE_HOST = "dev";
+  };
 }

@@ -9,19 +9,20 @@ Flat, explicit NixOS modules with locked inputs. Required setup belongs here—n
 | File | Owns |
 | --- | --- |
 | `flake.nix`, `flake.lock` | Host entry points, exact Nixpkgs/Home Manager/tool/dotfile revisions and hashes |
-| `common.nix` | Shared environment, platform, Nix features and compatibility version |
-| `physical.nix`, `hardware-configuration.nix` | Laptop boot/storage, SDDM with only managed Hyprland, networking, Bluetooth, power, firmware and host-specific updates |
-| `configuration.nix` | EC2-only boot/storage/SSM integration, updater and repo ownership |
+| `common.nix` | Shared environment, locale/timezone, Nix features, update policy and compatibility version |
+| `physical.nix`, `hardware-configuration.nix` | Laptop boot/storage, panel scale, CPU sensor and checkout/target identity |
+| `configuration.nix` | AWS boot/storage/network/recovery integration and checkout/target identity |
 | `users.nix` | `dev`, SSH authorization, sudo, Home Manager and workspace ownership |
 | `tools.nix`, `network.nix` | Development toolkit, terminal/shell, rootless Podman, VPN clients and network diagnostics |
 | `colors.nix`, `wallpaper.nix`, `wallpaper.svg` | Shared One Ring palette, hash-pinned wallpaper and original fallback artwork |
 | `desktop.nix`, `hyprland.lua`, `anyrun.css`, `swaync.css`, `desktop-help.py`, `desktop-actions.py` | Session/bar, launchers, described help, capture, clipboard, notifications, lock/idle and styling |
 | `apps.nix`, `element-nightly.nix` | Firefox ESR, KeePassXC, Thunderbird, Steam, pinned Element Nightly, Slack, file/media viewers and MIME defaults |
 | `neovim.nix`, `neovim-test.lua` | Unmodified upstream editor deployment and opt-in native runtime audit |
-| `updates.nix`, `update-system.sh`, `update-test.py` | Daily isolated-worktree updates and failure/concurrency regression tests |
-| `physical-test.nix`, `tools-test.nix` | Built host/session assertions and bounded offline tool/help smoke tests |
+| `updates.nix`, `update-system.sh`, `update-test.py` | Shared dev-owned checkouts, daily boot-staged updates and failure/concurrency regression tests |
+| `switch-system.sh`, `switch-test.py` | Same installed manual apply/preview command on both hosts, with host identity supplied by Nix |
+| `physical-test.nix`, `tools-test.nix` | Physical/AWS safety, shared-policy assertions and bounded offline tool/help smoke tests |
 | `desktop-test.nix`, `desktop-test.py`, `audit-desktop.sh` | Disposable graphical/PAM/audio/scaling audit |
-| `workstation.nix`, `nvidia.nix` | Optional ReGreet workstation and NVIDIA modules; not this Intel laptop's configuration |
+| `workstation.nix`, `nvidia.nix` | Shared local hardware/SDDM integration for laptop and VM; separate opt-in NVIDIA support |
 | [DESKTOP.md](DESKTOP.md) | Live audit, wallpaper provenance, JaKooLit comparison and explicit feature-completion plan |
 
 ## Account and session
@@ -31,7 +32,8 @@ Flat, explicit NixOS modules with locked inputs. Required setup belongs here—n
 - The physical host uses the locally established `dev` password; mutable users preserve it. No plaintext password, private key or password hash is embedded in this repo/store.
 - At the user's request, **Plasma and the previously managed `kbot` account are removed**. This configuration does not delete `/home/kbot`; retained files and old generations are not erased. Home Manager only manages `dev`.
 - SDDM exposes **Hyprland (uwsm-managed)** only. Plain Hyprland is deliberately hidden because it does not start the session-bound bar, wallpaper, idle and polkit services. UWSM is the single session owner.
-- On EC2, SSM/root recovery and the host's integration remain intact; there is no graphical greeter or autologin. `/etc/nixos` is dev-owned there. On the laptop `/etc/nix` remains administrator-owned and the original `/etc/nixos` files are untouched.
+- Both checkouts are **dev-owned**, including Git metadata: `/etc/nix` on the laptop and `/etc/nixos` on EC2. Existing paths are retained to avoid moving deployed repositories. NixOS maintains ownership without following symlinks into the Nix store; the laptop's original `/etc/nixos` files stay untouched.
+- On EC2, AWS boot/storage/networking and SSM/SSH recovery remain intact; no physical greeter, Wi-Fi/Bluetooth or battery services are added. User settings, locale/timezone, packages and update policy come from the same modules. The graphical VM now uses the same SDDM/UWSM integration as the laptop.
 - The SSH key in `dev-authorized-keys` is public. Account/cloud/browser/VPN credentials and vaults remain user-controlled.
 
 ### Everyday controls
@@ -90,17 +92,19 @@ These are system-owned executables from Nix, not unmanaged `npm -g`, `pip instal
 
 ## Build and apply
 
-### One-command sync on this laptop
+### One-command sync on either host
 
-Save your work, then run from any directory (it requests sudo when needed):
+Save your work, then run the installed command from any directory:
 
 ```sh
-/etc/nix/switch-system.sh               # apply now and make it the boot default
-/etc/nix/switch-system.sh dry-activate  # build and preview changes without applying
-/etc/nix/switch-system.sh boot          # stage for the next boot instead
+switch-system               # explicitly apply now and make it the boot default
+switch-system dry-activate  # build and preview changes without applying
+switch-system boot          # stage for the next boot instead
 ```
 
-This builds the current **`/etc/nix#nixos`** checkout and activates that exact output, including `dev`'s Home Manager configuration. It shares the automatic updater's lock, stops on build failure, keeps recovery generations and never reboots. It does **not** pull remote Git changes or update `flake.lock`: “latest” here means the files currently checked out in `/etc/nix`. New source files must be added to Git to be included. Open a new terminal afterward for shell environment changes; some desktop changes require a fresh login. `--help` lists the modes, including temporary `test` activation.
+Nix supplies the correct checkout/target to the **same script** on each host. Builds run as `dev`; only activation uses sudo. It applies the exact built output, including `dev`'s Home Manager configuration, shares the automatic updater's lock, stops on build failure, keeps recovery generations and never reboots. It does **not** pull Git or update `flake.lock`: “latest” means the current checkout. Add new source files to Git for flakes to include them. Open a new terminal afterward for shell environment changes; some desktop changes require a fresh login. `--help` lists the modes, including temporary `test` activation.
+
+Direct `/etc/nix/switch-system.sh` execution still defaults to the laptop. When running the source script on EC2 before the packaged command is installed, explicitly set `NIXOS_CONFIG_REPO=/etc/nixos NIXOS_UPDATE_HOST=dev` and choose `boot`. Automatic updates, unlike an explicit manual switch, **always stage for the next boot on both hosts**.
 
 ### Detailed validation and activation
 
@@ -114,7 +118,7 @@ nix build .#checks.x86_64-linux.updates \
   .#checks.x86_64-linux.desktop-config \
   .#checks.x86_64-linux.physical-config \
   .#checks.x86_64-linux.tools .#checks.x86_64-linux.desktop-actions \
-  --no-update-lock-file --no-link
+  .#checks.x86_64-linux.switch-system --no-update-lock-file --no-link
 nix build .#nixosConfigurations.nixos.config.system.build.toplevel \
   --no-update-lock-file --out-link result-nixos
 built=$(readlink -f result-nixos)
@@ -132,7 +136,7 @@ sudo "$built/sw/bin/nixos-rebuild" test --no-reexec --store-path "$built"
 sudo "$built/sw/bin/nixos-rebuild" switch --no-reexec --store-path "$built"
 ```
 
-`test` is a real activation, not a dry run. For a non-disruptive deployment that takes effect on next boot, use `boot` instead of `test`/`switch`. The daily physical updater uses that policy.
+`test` is a real activation, not a dry run. For a non-disruptive deployment that takes effect on next boot, use `boot` instead of `test`/`switch`. Both hosts' daily updaters use that policy.
 
 On **EC2 only**, use `/etc/nixos` and `.#nixosConfigurations.dev.config.system.build.toplevel`. Run the same evaluation/checks and activate the exact output with its own `nixos-rebuild --no-reexec --store-path`. Never select a target merely because it matches your username.
 
@@ -158,9 +162,8 @@ If boot fails, choose a known-good systemd-boot generation (hold Space at startu
 
 - **Every day**, `nixos-update.timer` runs with up to one hour of jitter and catches missed runs. It advances `nixpkgs`, `home-manager`, and `nixpkgs-latest`; the Neovim source remains fixed.
 - The system/desktop use the stable `nixos-26.05` and matching Home Manager release branch. Most standalone CLI tools use the locked **Nixpkgs master** input to avoid stable-release feature lag. They are imported separately, **not** overlaid onto the desktop's GCC/Python/libraries. The Nix daemon and service-integrated packages remain from the system pin.
-- **Laptop:** administrator-owned `/etc/nix`, explicit `nixos` target, build/check/record and **stage for next boot**. No surprise logout, live compositor replacement or automatic reboot. Installed versions change when that generation is booted, or when explicitly switched by the user.
-- **EC2:** dev-owned `/etc/nixos`, explicit `dev` target and live `switch`, retaining the prior activation/rollback behavior.
-- Both policies skip dirty/detached repositories, serialize runs, use an isolated worktree, check for edits again after dry activation, commit only the tested lock, attempt rollback on failure and retain recovery generations. A failed rollback is reported as failure, not silently marked successful.
+- **Same policy on both hosts:** run as `dev`, build/check/record and **stage for next boot**. There is no automatic live switch, logout or reboot. Only checkout path and explicit flake target differ: laptop `/etc/nix#nixos`, EC2 `/etc/nixos#dev`. Installed versions change when that generation is booted, or explicitly switched by the user.
+- Both skip dirty/detached repositories, serialize runs with manual switching, use an isolated worktree, check for edits again after dry activation and commit only the tested lock. On staging failure, the updater restores the previously selected **boot generation**, including a generation that was already staged but not running. A failed rollback is reported as failure; recovery generations are retained.
 - **“Current” means newest successfully checked/built versions packaged in those branch heads**, not a guarantee of every upstream release immediately. Master can contain breakage and uncached builds; failure retains the previous working generation. Upstream Pi, Mason/plugin downloads, browser add-ons, firmware and project dependencies are separate update boundaries. No runtime self-updater is bolted on to override Nix-owned executables.
 - The updater does not fetch/merge repository code from origin. Configuration code is reviewed separately. A dirty working tree intentionally prevents automatic input changes until work is committed/stashed.
 

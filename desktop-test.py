@@ -72,7 +72,9 @@ assert "0.42" in session("wpctl get-volume @DEFAULT_AUDIO_SINK@")
 session("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ 1")
 assert "MUTED" in session("wpctl get-volume @DEFAULT_AUDIO_SOURCE@")
 session("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ 0")
-machine.succeed("systemctl is-active systemd-resolved")
+machine.succeed("systemctl is-active NetworkManager display-manager")
+machine.succeed("test $(stat -c %U /etc/nix) = dev")
+machine.succeed("test $(stat -c %U /var/cache/nixos-update) = dev")
 
 launch("terminal", "kitty --title 'Workspace ready' sh -c " + shlex.quote(
     "printf '\\n  WORKSPACE READY\\n\\n'; "

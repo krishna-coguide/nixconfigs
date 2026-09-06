@@ -1,11 +1,10 @@
-# Host and activation policy come from the host's systemd unit, never inference
-# from a login name. Physical builds are staged for next boot; EC2 switches live.
+# Both hosts stage for the next boot. Only the checkout and flake target differ;
+# target identity is explicit, never inferred from the login name.
 repo=${NIXOS_CONFIG_REPO:?Set NIXOS_CONFIG_REPO}
 host=${NIXOS_UPDATE_HOST:?Set NIXOS_UPDATE_HOST}
-mode=${NIXOS_UPDATE_MODE:?Set NIXOS_UPDATE_MODE}
-case "$host:$mode" in
-  dev:switch|nixos:boot) ;;
-  *) echo "Refusing unsupported update target/policy: $host:$mode" >&2; exit 2 ;;
+case "$host" in
+  dev|nixos) ;;
+  *) echo "Refusing unsupported update target: $host" >&2; exit 2 ;;
 esac
 state=${CACHE_DIRECTORY:-/var/cache/nixos-update}
 mkdir -p "$state"
@@ -40,7 +39,7 @@ fi
 nix flake check --no-build --no-update-lock-file
 nix build .#checks.x86_64-linux.updates .#checks.x86_64-linux.desktop-config \
   .#checks.x86_64-linux.physical-config .#checks.x86_64-linux.tools \
-  .#checks.x86_64-linux.desktop-actions \
+  .#checks.x86_64-linux.desktop-actions .#checks.x86_64-linux.switch-system \
   --no-update-lock-file --no-link
 git add flake.lock
 git -c user.name='NixOS Updater' -c user.email='nixos-updater@localhost' \
@@ -60,21 +59,17 @@ if ! unchanged; then
   echo 'Configuration changed during the build; leaving it untouched.'
   exit 0
 fi
-if [ "$mode" = boot ]; then
-  # Preserve an already staged generation on failure, not just the running one.
-  previous=$(readlink -f /nix/var/nix/profiles/system)
-else
-  previous=$(readlink -f /run/current-system)
-fi
+# Preserve an already staged generation on failure, not just the running one.
+previous=$(readlink -f /nix/var/nix/profiles/system)
 sudo "$built/sw/bin/nixos-rebuild" dry-activate --no-reexec --store-path "$built"
 if ! unchanged; then
   echo 'Configuration changed during dry activation; leaving it untouched.'
   exit 0
 fi
 git merge --ff-only "$candidate"
-if ! sudo "$built/sw/bin/nixos-rebuild" "$mode" --no-reexec --store-path "$built"; then
-  echo 'Activation failed; restoring the previous system/profile. See the journal.' >&2
-  sudo "$previous/sw/bin/nixos-rebuild" "$mode" --no-reexec --store-path "$previous"
+if ! sudo "$built/sw/bin/nixos-rebuild" boot --no-reexec --store-path "$built"; then
+  echo 'Staging failed; restoring the previous boot generation. See the journal.' >&2
+  sudo "$previous/sw/bin/nixos-rebuild" boot --no-reexec --store-path "$previous"
   if [ "$(git rev-parse HEAD)" = "$candidate" ] && [ -z "$(git status --porcelain)" ]; then
     git -c user.name='NixOS Updater' -c user.email='nixos-updater@localhost' \
       revert --no-edit "$candidate"
@@ -82,5 +77,5 @@ if ! sudo "$built/sw/bin/nixos-rebuild" "$mode" --no-reexec --store-path "$built
   exit 1
 fi
 printf '%s %s %s\n' "$(date -Is)" "$candidate" "$built" > "$state/last-success"
-echo "Updated $host ($mode): $built"
+echo "Updated $host (staged for next boot): $built"
 # No forced reboot or garbage collection: recovery generations are retained.

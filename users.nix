@@ -1,6 +1,8 @@
 { pkgs, ... }:
 
 {
+  # Preserve locally provisioned passwords on every host; never invent one.
+  users.mutableUsers = true;
   users.users.dev = {
     isNormalUser = true;
     uid = 1001;
