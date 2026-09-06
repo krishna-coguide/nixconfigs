@@ -1,5 +1,6 @@
 # Bounded, offline smoke tests. No user caches, credentials, servers or downloads.
 { config, pkgs }:
+assert builtins.elem pkgs.tor-browser config.home-manager.users.dev.home.packages;
 pkgs.runCommand "workstation-tools-check"
   {
     nativeBuildInputs = [ pkgs.python3 ];
@@ -23,6 +24,8 @@ pkgs.runCommand "workstation-tools-check"
       hurl oha step mkcert cosign syft grype mosh sshfs asciinema vhs switch-system; do
       command -v "$tool" >/dev/null
     done
+    # Inspect only: don't start a graphical browser or make Tor connections.
+    test -x ${pkgs.tor-browser}/bin/tor-browser
     test -x ${config.home-manager.users.dev.programs.lazygit.package}/bin/lazygit
     test -x ${config.home-manager.users.dev.programs.tmux.package}/bin/tmux
     switch-system --help > "$TMPDIR/switch-help"

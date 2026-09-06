@@ -16,7 +16,7 @@ Flat, explicit NixOS modules with locked inputs. Required setup belongs here—n
 | `tools.nix`, `network.nix` | Development toolkit, terminal/shell, rootless Podman, VPN/proxy clients, local Tor service and network diagnostics |
 | `colors.nix`, `wallpaper.nix`, `wallpaper.svg` | Shared One Ring palette, hash-pinned wallpaper and original fallback artwork |
 | `desktop.nix`, `hyprland.lua`, `anyrun.css`, `swaync.css`, `desktop-help.py`, `desktop-actions.py` | Session/bar, launchers, described help, capture, clipboard, notifications, lock/idle and styling |
-| `apps.nix`, `element-nightly.nix` | Firefox ESR, KeePassXC, Thunderbird, Steam, pinned Element Nightly, Slack, file/media viewers and MIME defaults |
+| `apps.nix`, `element-nightly.nix` | Firefox ESR, Tor Browser, KeePassXC, Thunderbird, Steam, pinned Element Nightly, Slack, file/media viewers and MIME defaults |
 | `neovim.nix`, `neovim-test.lua` | Unmodified upstream editor deployment and opt-in native runtime audit |
 | `updates.nix`, `update-system.sh`, `update-test.py` | Shared dev-owned checkouts, daily boot-staged updates and failure/concurrency regression tests |
 | `switch-system.sh`, `switch-test.py` | Same installed manual apply/preview command on both hosts, with host identity supplied by Nix |
@@ -114,7 +114,7 @@ curl --fail --show-error --max-time 60 --proxy socks5h://127.0.0.1:9050 \
 torsocks curl --fail --show-error --max-time 60 https://check.torproject.org/api/ip
 ```
 
-`torsocks` and `proxychains4` are opt-in wrappers, not sandboxes: static binaries and applications that bypass their hooks are not reliably covered. Tor carries TCP, not arbitrary UDP/ICMP; do not assume tools such as fping, raw-packet nmap or traceroute run through it. Keep ordinary DNS lookups out of workflows that require Tor-side resolution. Use Tor Browser separately for browser anonymity rather than treating a generic browser's proxy setting as equivalent.
+`torsocks` and `proxychains4` are opt-in wrappers, not sandboxes: static binaries and applications that bypass their hooks are not reliably covered. Tor carries TCP, not arbitrary UDP/ICMP; do not assume tools such as fping, raw-packet nmap or traceroute run through it. Keep ordinary DNS lookups out of workflows that require Tor-side resolution. **Tor Browser is installed by `apps.nix`**: launch `tor-browser` or select **Tor Browser** in the application launcher after applying the configuration. It retains its separate profile and upstream privacy defaults; Firefox remains the default browser. Tor Browser is not simply a generic browser pointed at the system SOCKS port, and it is not auto-started.
 
 ## Build and apply
 

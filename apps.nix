@@ -100,6 +100,9 @@ in
 
   home-manager.users.dev = {
     home.packages = with pkgs; [
+      # Keep Tor Browser's separate profile and upstream privacy defaults.
+      # This is not Firefox pointed at the system Tor SOCKS port.
+      tor-browser
       thunderbird
       file-roller
       imv
