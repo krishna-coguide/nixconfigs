@@ -80,6 +80,11 @@ in
   services.gvfs.enable = true;
   services.fwupd.enable = true;
   home-manager.users.dev.services.udiskie.enable = true;
+  # One clean step below the panel's automatic 150%: 1440x900 logical pixels.
+  # Leave external displays on the shared configuration's automatic scale.
+  home-manager.users.dev.wayland.windowManager.hyprland.extraConfig = lib.mkAfter ''
+    hl.monitor({ output = "eDP-1", mode = "preferred", position = "auto", scale = 4 / 3 })
+  '';
   hardware.bluetooth = {
     enable = true;
     powerOnBoot = false;
