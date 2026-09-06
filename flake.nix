@@ -31,7 +31,7 @@
         ];
       };
 
-      # Physical host: adds dev/Hyprland without removing kbot/Plasma.
+      # Physical laptop: dev + managed Hyprland; preserve its boot/storage.
       nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
         specialArgs = { inherit inputs; };
         modules = [
@@ -41,6 +41,9 @@
       };
 
       formatter.x86_64-linux = nixpkgs.legacyPackages.x86_64-linux.nixfmt;
+      packages.x86_64-linux.element-nightly = import ./element-nightly.nix {
+        pkgs = nixpkgs.legacyPackages.x86_64-linux;
+      };
 
       nixosModules = {
         desktop = ./desktop.nix;
@@ -56,16 +59,28 @@
         in
         {
           desktop = import ./desktop-test.nix { inherit inputs pkgs; };
+          tools = import ./tools-test.nix {
+            inherit pkgs;
+            config = inputs.self.nixosConfigurations.nixos.config;
+          };
           physical-config = import ./physical-test.nix {
             inherit pkgs;
             config = inputs.self.nixosConfigurations.nixos.config;
           };
+          desktop-actions =
+            pkgs.runCommand "desktop-actions-check" { nativeBuildInputs = [ pkgs.python3 ]; }
+              ''
+                python ${./desktop-actions-test.py} ${./desktop-actions.py}
+                touch "$out"
+              '';
           desktop-config =
             pkgs.runCommand "hyprland-config-check" { nativeBuildInputs = [ pkgs.hyprland ]; }
               ''
                 export HOME="$TMPDIR/home" XDG_RUNTIME_DIR="$TMPDIR/runtime"
                 mkdir -m 700 -p "$HOME" "$XDG_RUNTIME_DIR"
-                Hyprland --verify-config -c ${./hyprland.lua}
+                Hyprland --verify-config -c ${
+                  inputs.self.nixosConfigurations.nixos.config.home-manager.users.dev.xdg.configFile."hypr/hyprland.lua".source
+                }
                 touch "$out"
               '';
           updates =

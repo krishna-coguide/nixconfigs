@@ -7,16 +7,7 @@
 
 let
   c = import ./colors.nix;
-  # Select secure storage without rebuilding the cached Electron application.
-  elementWithKeyring = pkgs.symlinkJoin {
-    name = "element-desktop-with-keyring-${pkgs.element-desktop.version}";
-    paths = [ pkgs.element-desktop ];
-    nativeBuildInputs = [ pkgs.makeWrapper ];
-    postBuild = ''
-      wrapProgram "$out/bin/element-desktop" --add-flags "--password-store=gnome-libsecret"
-    '';
-    inherit (pkgs.element-desktop) meta;
-  };
+  elementNightly = import ./element-nightly.nix { inherit pkgs; };
   browserAddon = pkgs.fetchurl {
     name = "keepassxc-browser-1.10.3.xpi";
     url = "https://addons.mozilla.org/firefox/downloads/file/4831838/keepassxc_browser-1.10.3.xpi";
@@ -58,6 +49,13 @@ in
         "nvidia-persistenced"
       ]
     );
+  programs.thunar = {
+    enable = true;
+    plugins = [
+      pkgs.thunar-archive-plugin
+      pkgs.thunar-volman
+    ];
+  };
   programs.steam = {
     enable = true;
     remotePlay.openFirewall = false;
@@ -66,11 +64,31 @@ in
   };
   programs.firefox = {
     enable = true;
-    # Stable's ESR is security-current (153.2); regular 155.0 is one patch behind.
+    # Use the security-supported ESR line from the system pin.
     package = pkgs.firefox-esr;
     nativeMessagingHosts.packages = [ pkgs.keepassxc ];
     policies = {
       DisableTelemetry = true;
+      DontCheckDefaultBrowser = true;
+      NoDefaultBookmarks = true;
+      Preferences = {
+        "browser.compactmode.show" = {
+          Value = true;
+          Status = "default";
+        };
+        "browser.uidensity" = {
+          Value = 1;
+          Status = "default";
+        };
+        "browser.newtabpage.activity-stream.showSponsored" = {
+          Value = false;
+          Status = "locked";
+        };
+        "browser.newtabpage.activity-stream.showSponsoredTopSites" = {
+          Value = false;
+          Status = "locked";
+        };
+      };
       OfferToSaveLogins = false;
       ExtensionSettings."keepassxc-browser@keepassxc.org" = {
         installation_mode = "normal_installed";
@@ -83,11 +101,20 @@ in
   home-manager.users.dev = {
     home.packages = with pkgs; [
       thunderbird
+      file-roller
+      imv
       # Electron does not reliably detect a keyring under Hyprland. Use the
       # KeePassXC Secret Service explicitly; never fall back to basic_text.
-      elementWithKeyring
+      elementNightly
       slack
     ];
+    programs.mpv = {
+      enable = true;
+      config = {
+        hwdec = "auto-safe";
+        keep-open = true;
+      };
+    };
     programs.keepassxc = {
       enable = true;
       autostart = true;
@@ -113,7 +140,7 @@ in
         inputbar-fg = c.text;
         completion-bg = c.background;
         completion-fg = c.text;
-        completion-highlight-bg = "#354562";
+        completion-highlight-bg = c.selection;
         completion-highlight-fg = c.text;
         notification-bg = c.surface;
         notification-fg = c.text;
@@ -127,11 +154,21 @@ in
       enable = true;
       defaultApplications = {
         "application/pdf" = [ "org.pwmt.zathura.desktop" ];
+        "inode/directory" = [ "thunar.desktop" ];
+        "application/zip" = [ "org.gnome.FileRoller.desktop" ];
+        "image/png" = [ "imv.desktop" ];
+        "image/jpeg" = [ "imv.desktop" ];
+        "image/webp" = [ "imv.desktop" ];
+        "video/mp4" = [ "mpv.desktop" ];
+        "video/x-matroska" = [ "mpv.desktop" ];
+        "audio/mpeg" = [ "mpv.desktop" ];
         "text/html" = [ "firefox-esr.desktop" ];
         "x-scheme-handler/http" = [ "firefox-esr.desktop" ];
         "x-scheme-handler/https" = [ "firefox-esr.desktop" ];
         "x-scheme-handler/mailto" = [ "thunderbird.desktop" ];
-        "x-scheme-handler/matrix" = [ "element-desktop.desktop" ];
+        "x-scheme-handler/matrix" = [ "element-desktop-nightly.desktop" ];
+        "x-scheme-handler/element" = [ "element-desktop-nightly.desktop" ];
+        "x-scheme-handler/io.element.desktop" = [ "element-desktop-nightly.desktop" ];
       };
     };
   };

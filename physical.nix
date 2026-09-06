@@ -1,10 +1,28 @@
-# This machine: retain the installed kbot/Plasma recovery environment and add dev.
+# This machine: dev + managed Hyprland only; preserve boot/storage and old home data.
 # Hardware settings were copied from /etc/nixos; those original files stay untouched.
-{ pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+let
+  managedHyprlandSession =
+    pkgs.runCommand "hyprland-managed-session"
+      {
+        passthru.providedSessions = [ "hyprland-uwsm" ];
+      }
+      ''
+        mkdir -p "$out/share/wayland-sessions"
+        ln -s ${config.programs.hyprland.package}/share/wayland-sessions/hyprland-uwsm.desktop \
+          "$out/share/wayland-sessions/hyprland-uwsm.desktop"
+      '';
+in
 {
   imports = [
     ./hardware-configuration.nix
     ./common.nix
+    ./updates.nix
   ];
 
   boot.loader = {
@@ -17,7 +35,7 @@
     enable = true;
     plugins = [ pkgs.networkmanager-openvpn ];
   };
-  # Keep the installed DNS setup while testing the additional desktop.
+  # Keep NetworkManager's installed DNS policy.
   services.resolved.enable = false;
 
   time.timeZone = "America/Chicago";
@@ -34,8 +52,8 @@
     LC_TIME = "en_US.UTF-8";
   };
 
-  # SDDM offers both Plasma and Hyprland (uwsm-managed). Do not replace it with
-  # workstation.nix's greetd/ReGreet or enable autologin during this migration.
+  # Keep the working SDDM greeter; only the managed Hyprland session is offered.
+  # No autologin, second desktop environment, or competing session owner.
   services.xserver = {
     enable = true;
     xkb = {
@@ -43,32 +61,57 @@
       variant = "";
     };
   };
-  services.displayManager.sddm.enable = true;
-  services.desktopManager.plasma6.enable = true;
+  services.displayManager = {
+    sddm.enable = true;
+    defaultSession = "hyprland-uwsm";
+    # The upstream package also advertises a plain session that never starts
+    # our bar/idle/polkit services. Hide that trap, not the managed startup.
+    sessionPackages = lib.mkForce [ managedHyprlandSession ];
+  };
   services.printing.enable = true;
   services.pulseaudio.enable = false;
 
-  # Preserve kbot's existing password and allow `sudo passwd dev` after activation.
-  # No password hashes or credentials are copied into this repository/the store.
+  # Preserve dev's locally established password. Removing the previously
+  # managed kbot account does NOT request deletion of /home/kbot.
   users.mutableUsers = true;
-  users.users.kbot = {
-    isNormalUser = true;
-    uid = 1000;
-    home = "/home/kbot";
-    description = "kbot";
-    extraGroups = [
-      "networkmanager"
-      "wheel"
-    ];
-    packages = [ pkgs.kdePackages.kate ];
-  };
   users.users.dev.extraGroups = [ "networkmanager" ];
   environment.systemPackages = [ pkgs.networkmanagerapplet ];
+  services.udisks2.enable = true;
+  services.gvfs.enable = true;
+  services.fwupd.enable = true;
   home-manager.users.dev.services.udiskie.enable = true;
+  hardware.bluetooth = {
+    enable = true;
+    powerOnBoot = false;
+  };
+  services.blueman.enable = true;
+  services.upower.enable = true;
+  services.power-profiles-daemon.enable = true;
+  # sysinfo's component label for this Intel CPU, not another laptop's ACPI zone.
+  home-manager.users.dev.programs.ashell.settings.system_info.temperature.sensor =
+    "coretemp Package id 0";
+  home-manager.users.dev.xdg.configFile."autostart/blueman.desktop".text = ''
+    [Desktop Entry]
+    Type=Application
+    Name=Blueman
+    Hidden=true
+  '';
 
   # Retain the installed host's package policy.
   nixpkgs.config.allowUnfree = true;
 
-  # Intentionally no updates.nix: that updater builds the EC2 dev target.
+  # /etc/nix is administrator-owned. Stage tested updates for the next boot,
+  # rather than restarting a compositor/display manager under an active user.
+  systemd.services.nixos-update = {
+    environment = {
+      NIXOS_CONFIG_REPO = "/etc/nix";
+      NIXOS_UPDATE_HOST = "nixos";
+      NIXOS_UPDATE_MODE = "boot";
+    };
+    serviceConfig = {
+      User = "root";
+      Group = "root";
+    };
+  };
   # Neither /etc/nixos nor /home/kbot is handed over to dev/Home Manager.
 }

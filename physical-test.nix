@@ -2,7 +2,6 @@
 { config, pkgs }:
 let
   inherit (pkgs) lib;
-  kbot = config.users.users.kbot;
   dev = config.users.users.dev;
   btrfsDevice = "/dev/disk/by-uuid/8a16015f-d6f8-4f74-8558-6261b9112216";
   mounts = {
@@ -50,15 +49,11 @@ let
     {
       assertion =
         config.users.mutableUsers
-        && kbot.isNormalUser
-        && kbot.uid == 1000
-        && kbot.home == "/home/kbot"
-        && builtins.elem "wheel" kbot.extraGroups
-        && builtins.elem "networkmanager" kbot.extraGroups
-        && kbot.password == null
-        && kbot.hashedPassword == null
-        && kbot.hashedPasswordFile == null;
-      message = "Keep kbot's identity, local password and administrative/network access.";
+        && !(config.users.users ? kbot)
+        && dev.password == null
+        && dev.hashedPassword == null
+        && dev.hashedPasswordFile == null;
+      message = "Retire kbot without overwriting dev's locally established password.";
     }
     {
       assertion =
@@ -68,17 +63,19 @@ let
         && builtins.elem "wheel" dev.extraGroups
         && builtins.elem "networkmanager" dev.extraGroups
         && builtins.attrNames config.home-manager.users == [ "dev" ];
-      message = "Add dev independently; Home Manager must not manage kbot's home.";
+      message = "dev is the sole managed daily account, with local administration/network access.";
     }
     {
       assertion =
         config.services.displayManager.sddm.enable
-        && config.services.desktopManager.plasma6.enable
+        && !config.services.desktopManager.plasma6.enable
         && config.programs.hyprland.enable
         && config.programs.hyprland.withUWSM
         && !config.services.greetd.enable
-        && !config.services.displayManager.autoLogin.enable;
-      message = "Keep the Plasma/SDDM recovery login alongside Hyprland, without autologin.";
+        && !config.services.displayManager.autoLogin.enable
+        && config.services.displayManager.defaultSession == "hyprland-uwsm"
+        && !(builtins.elem "hyprland" config.services.displayManager.sessionData.sessionNames);
+      message = "Offer only the managed Hyprland desktop in SDDM, without Plasma or autologin.";
     }
     {
       assertion =
@@ -91,11 +88,14 @@ let
     }
     {
       assertion =
-        !(config.systemd.services ? nixos-update)
-        && !(config.systemd.timers ? nixos-update)
+        config.systemd.services.nixos-update.environment.NIXOS_UPDATE_HOST == "nixos"
+        && config.systemd.services.nixos-update.environment.NIXOS_CONFIG_REPO == "/etc/nix"
+        && config.systemd.services.nixos-update.environment.NIXOS_UPDATE_MODE == "boot"
+        && config.systemd.services.nixos-update.serviceConfig.User == "root"
+        && config.systemd.timers.nixos-update.timerConfig.Persistent
         && !(config.systemd.services ? amazon-ssm-agent)
         && !(builtins.elem "Z /etc/nixos - dev users -" config.systemd.tmpfiles.rules);
-      message = "The physical host must not inherit EC2 services, updater or repo ownership.";
+      message = "Physical updates must stage the physical target, never EC2 or live-session restarts.";
     }
     {
       assertion =
@@ -132,8 +132,9 @@ in
 assert lib.all (test: lib.assertMsg test.assertion test.message) tests;
 pkgs.runCommand "physical-config-check" { } ''
   sessions=${config.services.displayManager.sessionData.desktops}/share
-  test -f "$sessions/wayland-sessions/plasma.desktop"
+  test ! -e "$sessions/wayland-sessions/plasma.desktop"
   test -f "$sessions/wayland-sessions/hyprland-uwsm.desktop"
+  test ! -e "$sessions/wayland-sessions/hyprland.desktop"
   for tool in wg wg-quick openvpn iperf3 nmap traceroute whois mtr dig tcpdump ethtool nc socat nm-connection-editor; do
     test -x "${config.system.path}/bin/$tool"
   done

@@ -1,4 +1,9 @@
-{ pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   updater = pkgs.writeShellApplication {
     name = "update-system";
@@ -13,17 +18,21 @@ let
 in
 {
   environment.systemPackages = [ updater ];
-  systemd.tmpfiles.rules = [ "d /var/cache/nixos-update 0700 dev users -" ];
   systemd.services.nixos-update = {
-    description = "Build, record and apply stable NixOS updates without disturbing local work";
+    description = "Build and record host-specific NixOS/tool updates without disturbing local work";
+    environment = {
+      NIXOS_CONFIG_REPO = lib.mkDefault "/etc/nixos";
+      NIXOS_UPDATE_HOST = lib.mkDefault "dev";
+      NIXOS_UPDATE_MODE = lib.mkDefault "switch";
+    };
     wants = [ "network-online.target" ];
     after = [ "network-online.target" ];
     path = [ "/run/wrappers" ];
     serviceConfig = {
       Type = "oneshot";
-      User = "dev";
-      Group = "users";
-      WorkingDirectory = "/etc/nixos";
+      User = lib.mkDefault "dev";
+      Group = lib.mkDefault "users";
+      WorkingDirectory = config.systemd.services.nixos-update.environment.NIXOS_CONFIG_REPO;
       CacheDirectory = "nixos-update";
       UMask = "0077";
       Nice = 10;

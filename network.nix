@@ -1,5 +1,15 @@
-{ lib, pkgs, ... }:
-
+{
+  inputs,
+  lib,
+  pkgs,
+  ...
+}:
+let
+  latest = import inputs.nixpkgs-latest {
+    inherit (pkgs.stdenv.hostPlatform) system;
+    config = pkgs.config;
+  };
+in
 {
   # Keep each host's existing interface/DHCP owner. On EC2 this is dhcpcd;
   # NixOS wires its resolvconf hook to resolved's compatibility interface.
@@ -13,8 +23,11 @@
     };
   };
 
-  programs.mtr.enable = true;
-  environment.systemPackages = with pkgs; [
+  programs.mtr = {
+    enable = true;
+    package = latest.mtr;
+  };
+  environment.systemPackages = with latest; [
     wireguard-tools # wg and wg-quick; no interfaces or credentials are configured.
     openvpn
     iperf3
@@ -26,6 +39,10 @@
     ethtool
     netcat-openbsd
     socat
+    doggo
+    iftop
+    bandwhich
+    wireshark-cli # tshark; no capture group/capabilities or daemon.
   ];
   # Client tools only: no VPN services, peers, keys, routes or firewall ports.
 }

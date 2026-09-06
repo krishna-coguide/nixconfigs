@@ -1,24 +1,27 @@
-* { font-family: Inter, sans-serif; font-size: 17px; }
+* { font-family: Inter, sans-serif; font-size: 16px; }
 window { background: transparent; }
 box.main {
-  padding: 14px;
-  margin: 18px;
-  border-radius: 16px;
-  border: 2px solid #78a9ff;
-  background: #161616;
+  padding: 12px;
+  margin: 12px;
+  border-radius: 6px;
+  border: 2px solid @accent@;
+  background: @background@;
   box-shadow: 0 8px 18px rgba(0, 0, 0, .35);
 }
 text {
-  color: #f2f4f8;
-  background: #262626;
+  color: @text@;
+  background: @surface@;
   min-height: 38px;
   padding: 10px 14px;
-  border-radius: 9px;
+  border-radius: 4px;
 }
 .matches, list.plugin { background: transparent; }
 box.plugin:first-child { margin-top: 10px; }
-.match { padding: 9px; border-radius: 9px; background: transparent; }
-.match:selected { background: #2e3f5f; }
-label.match { color: #f2f4f8; }
-label.match.description { font-size: 14px; color: #a2a9b0; }
-label.plugin.info { color: #a2a9b0; }
+/* The row, boxes, icon AND labels all share .match upstream. Padding that
+   class multiplies row height until the launcher extends off the screen. */
+.match { background: transparent; }
+row.match { padding: 7px 10px; border-radius: 4px; }
+row.match:selected { background: @selection@; }
+label.match { color: @text@; }
+label.match.description { font-size: 14px; color: @muted@; }
+label.plugin.info { color: @muted@; }

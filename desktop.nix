@@ -7,9 +7,22 @@
 
 let
   c = import ./colors.nix;
-  wallpaper = pkgs.runCommand "quiet-orbit.png" { nativeBuildInputs = [ pkgs.resvg ]; } ''
-    resvg ${./wallpaper.svg} "$out"
-  '';
+  renderColors =
+    text:
+    builtins.replaceStrings (map (name: "@${name}@") (
+      builtins.attrNames c
+    )) (builtins.attrValues c) text;
+  rgb = color: "rgb(${lib.removePrefix "#" color})";
+  wallpaper = import ./wallpaper.nix { inherit pkgs; };
+  help = pkgs.writeShellApplication {
+    name = "desktop-help";
+    runtimeInputs = [
+      pkgs.python3
+      pkgs.hyprland
+      pkgs.fuzzel
+    ];
+    text = ''exec python ${./desktop-help.py} "$@"'';
+  };
   wallpaperInit = pkgs.writeShellApplication {
     name = "initialize-wallpaper";
     runtimeInputs = [
@@ -28,22 +41,41 @@ let
       exit 1
     '';
   };
-  screenshot = pkgs.writeShellApplication {
-    name = "desktop-screenshot";
+  actions = pkgs.writeShellApplication {
+    name = "desktop";
     runtimeInputs = with pkgs; [
+      python3
+      hyprland
+      uwsm
+      systemd
+      fuzzel
+      libnotify
+      cliphist
+      wl-clipboard
       grim
       slurp
       satty
-      wl-clipboard
-      coreutils
+      wf-recorder
+      wireplumber
+      pulseaudio
+      brightnessctl
+      power-profiles-daemon
+      xdg-user-dirs
+      xdg-utils
+      swaynotificationcenter
+      hyprlock
+      networkmanager
+      util-linux
     ];
     text = ''
-      geometry=$(slurp) || exit 0
-      [ -n "$geometry" ] || exit 0
-      mkdir -p "$HOME/Pictures/Screenshots"
-      grim -g "$geometry" - | satty --filename - --copy-command wl-copy \
-        --output-filename "$HOME/Pictures/Screenshots/$(date +%Y-%m-%d_%H-%M-%S).png"
+      export DESKTOP_EMOJI_FILE=${pkgs.unicode-emoji.emoji-test}/share/unicode/emoji/emoji-test.txt
+      exec python ${./desktop-actions.py} "$@"
     '';
+  };
+  screenshot = pkgs.writeShellApplication {
+    name = "desktop-screenshot";
+    runtimeInputs = [ actions ];
+    text = ''exec desktop screenshot area --annotate "$@"'';
   };
   launcherExec = pkgs.writeShellScript "anyrun-uwsm" ''
     kind=$1
@@ -93,6 +125,10 @@ in
     slurp
     satty
     screenshot
+    actions
+    help
+    hyprpicker
+    wf-recorder
     pavucontrol
     playerctl
     brightnessctl
@@ -155,7 +191,8 @@ in
     dconf.settings."org/gnome/desktop/interface" = {
       color-scheme = "prefer-dark";
       font-name = "Inter 11";
-      monospace-font-name = "JetBrainsMono Nerd Font 13";
+      monospace-font-name = "JetBrainsMono Nerd Font 12";
+      accent-color = "yellow";
     };
 
     wayland.windowManager.hyprland = {
@@ -164,7 +201,7 @@ in
       portalPackage = null;
       systemd.enable = false; # UWSM owns the session and environment.
       configType = "lua";
-      extraConfig = builtins.readFile ./hyprland.lua;
+      extraConfig = renderColors (builtins.readFile ./hyprland.lua);
     };
     services.hyprpolkitagent.enable = true;
     services.awww.enable = true;
@@ -180,21 +217,25 @@ in
       settings = {
         log_level = "warn";
         position = "Top";
+        layer = "Top";
         modules = {
           left = [
             [
               "appLauncher"
               "Workspaces"
+              "desktopHelp"
             ]
+            "WindowTitle"
           ];
           center = [ "Tempo" ];
           right = [
+            "recording"
+            "MediaPlayer"
             "SystemInfo"
-            [
-              "Tray"
-              "Privacy"
-              "Settings"
-            ]
+            "notifications"
+            "Tray"
+            "Privacy"
+            "Settings"
           ];
         };
         CustomModule = [
@@ -203,22 +244,74 @@ in
             icon = "󰍜";
             command = "uwsm app -- anyrun";
           }
+          {
+            name = "desktopHelp";
+            icon = "󰋖";
+            command = "uwsm app -- desktop-help";
+          }
+          {
+            name = "notifications";
+            icon = "󰂚";
+            command = "uwsm app -- desktop notifications";
+            listen_cmd = "swaync-client -swb";
+            icons."dnd.*" = "󰂛";
+            alert = "notification";
+          }
+          {
+            name = "recording";
+            command = "uwsm app -- desktop record";
+            listen_cmd = "desktop status";
+            alert = "recording";
+          }
         ];
-        tempo.clock_format = "%a  %d %b  %H:%M";
-        workspaces = {
-          visibility_mode = "MonitorSpecific";
-          enable_workspace_filling = true;
+        enable_esc_key = true;
+        media_player.max_title_length = 18;
+        window_title = {
+          mode = "Title";
+          truncate_title_after_length = 26;
         };
         system_info = {
           indicators = [
             "Cpu"
             "Memory"
+            "Temperature"
           ];
           interval = 5;
         };
+        tempo.clock_format = "%a  %d %b  %H:%M";
+        workspaces = {
+          visibility_mode = "MonitorSpecific";
+          enable_workspace_filling = false;
+          workspace_names = [
+            "01"
+            "02"
+            "03"
+            "04"
+            "05"
+            "06"
+            "07"
+            "08"
+            "09"
+            "10"
+          ];
+        };
         settings = {
           lock_cmd = "loginctl lock-session";
-          logout_cmd = "uwsm stop";
+          logout_cmd = "uwsm app -- desktop power";
+          shutdown_cmd = "uwsm app -- desktop power";
+          reboot_cmd = "uwsm app -- desktop power";
+          CustomButton = [
+            {
+              name = "Actions";
+              icon = "󰒓";
+              command = "uwsm app -- desktop menu";
+            }
+            {
+              name = "Health";
+              icon = "󰄦";
+              command = "uwsm app -- kitty --hold -e desktop health";
+            }
+          ];
           audio_sinks_more_cmd = "uwsm app -- pavucontrol -t 3";
           audio_sources_more_cmd = "uwsm app -- pavucontrol -t 4";
           wifi_more_cmd = "uwsm app -- nm-connection-editor";
@@ -227,26 +320,24 @@ in
           indicators = [
             "IdleInhibitor"
             "Audio"
-            "Microphone"
           ]
           ++ lib.optionals networkManager [
             "Network"
             "Vpn"
           ]
           ++ lib.optionals bluetooth [ "Bluetooth" ]
-          ++ lib.optionals power [
-            "PowerProfile"
-            "Battery"
-            "Brightness"
-          ];
+          ++ lib.optionals power [ "Battery" ];
           audio_indicator_format = "IconAndPercentage";
         };
         appearance = {
           font_name = "Inter";
           scale_factor = 1.15;
-          style = "Islands";
+          style = "Solid";
           opacity = 1.0;
-          primary_color = c.blue;
+          primary_color = {
+            base = c.accent;
+            text = c.background;
+          };
           text_color = c.text;
           success_color = c.green;
           danger_color = c.red;
@@ -256,11 +347,7 @@ in
             strong = c.raised;
           };
           secondary_color.base = c.surface;
-          workspace_colors = [
-            c.blue
-            c.purple
-            c.cyan
-          ];
+          workspace_colors = [ c.accent ];
         };
       };
     };
@@ -273,44 +360,148 @@ in
           "${pkgs.anyrun}/lib/libapplications.so"
           "${pkgs.anyrun}/lib/librink.so"
         ];
-        width.fraction = 0.42;
-        y.fraction = 0.2;
+        width.fraction = 0.5;
+        y.fraction = 0.12;
         hidePluginInfo = true;
         closeOnClick = true;
-        maxEntries = 8;
+        showResultsImmediately = true;
+        maxEntries = 6;
       };
-      extraCss = builtins.readFile ./anyrun.css;
+      extraCss = renderColors (builtins.readFile ./anyrun.css);
       extraConfigFiles."applications.ron".text = ''
         (
           desktop_actions: false,
-          max_entries: 8,
+          hide_description: true,
+          max_entries: 6,
           terminal: Some((command: "uwsm", args: "app -- kitty -e {}")),
           preprocess_exec_script: Some("${launcherExec}"),
         )
       '';
     };
 
-    services.mako = {
+    # This pinned launcher needs a daemon for calculator copy-to-clipboard.
+    systemd.user.services.anyrun = {
+      Unit = {
+        Description = "Application launcher and calculator";
+        After = [ "graphical-session.target" ];
+        PartOf = [ "graphical-session.target" ];
+        ConditionEnvironment = "WAYLAND_DISPLAY";
+      };
+      Service = {
+        ExecStart = "${pkgs.anyrun}/bin/anyrun daemon";
+        Restart = "on-failure";
+      };
+      Install.WantedBy = [ "graphical-session.target" ];
+    };
+
+    # Fuzzel is the shared dmenu-style picker for actions/help; Anyrun remains
+    # the app launcher/calculator, not a second competing autostarted shell.
+    programs.fuzzel = {
       enable = true;
       settings = {
-        font = "Inter 11";
-        width = 360;
-        height = 160;
-        margin = "12";
-        padding = "14";
-        border-size = 2;
-        border-radius = 12;
-        background-color = c.background;
-        text-color = c.text;
-        border-color = c.border;
-        default-timeout = 6000;
-        max-visible = 4;
-        max-icon-size = 48;
-        "urgency=critical" = {
-          border-color = c.red;
-          default-timeout = 0;
+        main = {
+          font = "Inter:size=11";
+          terminal = "kitty";
+          "launch-prefix" = "uwsm app --";
+          "line-height" = 22;
+          width = 46;
+          lines = 10;
+          "horizontal-pad" = 18;
+          "vertical-pad" = 14;
+        };
+        colors = {
+          background = "${lib.removePrefix "#" c.background}ff";
+          text = "${lib.removePrefix "#" c.text}ff";
+          match = "${lib.removePrefix "#" c.accent}ff";
+          selection = "${lib.removePrefix "#" c.selection}ff";
+          "selection-text" = "${lib.removePrefix "#" c.text}ff";
+          "selection-match" = "${lib.removePrefix "#" c.accent}ff";
+          border = "${lib.removePrefix "#" c.border}ff";
+          prompt = "${lib.removePrefix "#" c.muted}ff";
+        };
+        border = {
+          width = 2;
+          radius = 6;
         };
       };
+    };
+
+    services.swaync = {
+      enable = true;
+      style = renderColors (builtins.readFile ./swaync.css);
+      settings = {
+        positionX = "right";
+        positionY = "top";
+        control-center-width = 340;
+        control-center-height = 500;
+        control-center-margin-top = 8;
+        control-center-margin-right = 8;
+        notification-window-width = 360;
+        fit-to-screen = false;
+        timeout = 6;
+        timeout-critical = 0;
+        keyboard-shortcuts = true;
+        hide-on-action = true;
+        widgets = [
+          "title"
+          "dnd"
+          "mpris"
+          "notifications"
+        ];
+        widget-config = {
+          title = {
+            text = "Notifications";
+            clear-all-button = true;
+            button-text = "Clear";
+          };
+          dnd.text = "Do not disturb";
+          mpris = {
+            image-size = 64;
+            image-radius = 4;
+          };
+        };
+      };
+    };
+    services.hyprsunset = {
+      enable = true;
+      settings.profile = [
+        {
+          time = "07:00";
+          identity = true;
+        }
+        {
+          time = "21:00";
+          temperature = 4200;
+        }
+      ];
+    };
+    systemd.user.services.desktop-clipboard = {
+      Unit = {
+        Description = "Session-local clipboard history";
+        After = [ "graphical-session.target" ];
+        PartOf = [ "graphical-session.target" ];
+        ConditionEnvironment = "WAYLAND_DISPLAY";
+      };
+      Service = {
+        ExecStart = "${pkgs.wl-clipboard}/bin/wl-paste --watch ${actions}/bin/desktop clipboard-store";
+        ExecStopPost = "${actions}/bin/desktop clipboard-clear";
+        Restart = "on-failure";
+        UMask = "0077";
+      };
+      Install.WantedBy = [ "graphical-session.target" ];
+    };
+    systemd.user.services.desktop-battery = lib.mkIf power {
+      Unit = {
+        Description = "Low/critical battery notifications";
+        After = [ "graphical-session.target" ];
+        PartOf = [ "graphical-session.target" ];
+        ConditionPathExistsGlob = "/sys/class/power_supply/BAT*";
+      };
+      Service = {
+        ExecStart = "${actions}/bin/desktop battery";
+        Restart = "on-failure";
+      };
+      Install.WantedBy = [ "graphical-session.target" ];
     };
     programs.hyprlock = {
       enable = true;
@@ -331,9 +522,9 @@ in
           {
             monitor = "";
             text = "cmd[update:1000] date +'%H:%M'";
-            font_size = 84;
+            font_size = 64;
             font_family = "Inter";
-            color = "rgb(f2f4f8)";
+            color = rgb c.text;
             position = "0,100";
             halign = "center";
             valign = "center";
@@ -343,7 +534,7 @@ in
             text = "$USER";
             font_size = 18;
             font_family = "Inter";
-            color = "rgb(a2a9b0)";
+            color = rgb c.muted;
             position = "0,0";
             halign = "center";
             valign = "center";
@@ -360,12 +551,13 @@ in
             dots_center = true;
             fade_on_empty = false;
             font_family = "Inter";
-            inner_color = "rgb(262626)";
-            outer_color = "rgb(78a9ff)";
-            font_color = "rgb(f2f4f8)";
-            check_color = "rgb(3ddbd9)";
-            fail_color = "rgb(ff6b7a)";
-            capslock_color = "rgb(f1c21b)";
+            rounding = 6;
+            inner_color = rgb c.surface;
+            outer_color = rgb c.accent;
+            font_color = rgb c.text;
+            check_color = rgb c.green;
+            fail_color = rgb c.red;
+            capslock_color = rgb c.yellow;
             placeholder_text = "<i>Password</i>";
             fail_text = "<i>Try again ($ATTEMPTS)</i>";
           }
@@ -377,7 +569,7 @@ in
       package = null; # NixOS owns the service and PAM integration.
       settings = {
         general = {
-          lock_cmd = "pidof hyprlock || hyprlock";
+          lock_cmd = "${actions}/bin/desktop lock-start";
           before_sleep_cmd = "loginctl lock-session";
           after_sleep_cmd = "hyprctl dispatch 'hl.dsp.dpms({ action = \"enable\" })'";
           inhibit_sleep = 3;

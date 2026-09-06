@@ -1,0 +1,31 @@
+* { font-family: Inter, sans-serif; font-size: 14px; color: @text@; }
+.control-center {
+  background: @background@;
+  border: 1px solid @border@;
+  border-radius: 6px;
+  padding: 10px;
+}
+.notification {
+  background: @surface@;
+  border: 1px solid @border@;
+  border-radius: 6px;
+  margin: 6px;
+}
+.notification.critical { border-color: @red@; }
+/* Keep keyboard focus visible without the upstream thick gray outer slab. */
+.notification-row:focus, .notification-group:focus { background: transparent; }
+.notification-row:focus .notification, .notification-group:focus .notification { border-color: @accent@; }
+.notification-row .notification-background .notification { box-shadow: none; }
+.notification-content { padding: 12px; }
+.summary { font-weight: 600; }
+.time, .body { color: @muted@; }
+button { background: @raised@; border-radius: 4px; border: none; padding: 6px 10px; }
+button:hover { background: @selection@; }
+button:checked, switch:checked { background: @accent@; color: @background@; }
+.widget-title { margin: 8px; }
+.widget-title > label { font-size: 18px; font-weight: 600; }
+.widget-dnd, .widget-volume, .widget-backlight, .widget-mpris { margin: 8px; }
+.widget-mpris-player { background: @surface@; border-radius: 6px; padding: 8px; }
+trough { background: @raised@; border-radius: 4px; }
+highlight, progress { background: @accent@; border-radius: 4px; }
+.close-button { background: @raised@; color: @text@; }
