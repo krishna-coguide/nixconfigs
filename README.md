@@ -124,7 +124,9 @@ project and your standard DSH home/shared skills mounted **read-write**. Its
 host Web listener defaults to localhost on the first free port in **3080–3100**;
 RAM, vCPUs, IPs and optional TAP networking are configured through Nix modules. The VM is headless by default and
 includes **Playwright CLI + matching Firefox**, with a writable, once-seeded
-`playwright-firefox` skill for isolated named sessions across subagents. No host
+`playwright-firefox` skill for isolated named sessions across subagents.
+**`dsh-context` is the only added third-party plugin**: installed into the shared
+Web profile on first startup, retained on restarts and updated explicitly. No host
 service is activated.
 
 ### Local Tor client

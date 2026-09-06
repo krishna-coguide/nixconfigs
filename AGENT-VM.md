@@ -68,13 +68,19 @@ Missing directories are created. Existing DSH home must be user-owned and privat
 `chmod 700 ~/.dsh` (or your actual `DSH_HOME`); existing credentials must be mode
 600 as DSH requires. The launcher never reads the credentials into Nix, copies
 them to the store, or replaces your settings/skills with generated content.
+Before starting the Web UI, the guest installs **only `dsh-context`** into the
+shared `web` profile if missing (details below). DSH/pnpm manages that profile's
+manifest, lockfile and dependencies; existing settings and other profiles stay intact.
 The one bundled `playwright-firefox` skill is seeded into the actual shared skills
 directory only if its `SKILL.md` is absent. It is a normal writable file (0600),
 not a store symlink; existing files and user edits are never overwritten.
 
-Root inside the guest is **not host root**. QEMU/9p writes as the launching host
-user, so newly created project files belong to you. The whole DSH directory is
-mounted instead of individual credential files so atomic rename-based saves work.
+Root inside the guest is **not host root**. Bubblewrap maps the launching user's
+UID/GID to namespace `0:0`, so 9p ownership matches guest root and pnpm's atomic
+saves can preserve it. All capabilities remain dropped. QEMU/9p still writes as
+the launching host user, so newly created project files belong to you. The whole
+DSH directory is mounted instead of individual credential files so atomic
+rename-based saves work.
 DSH retains each project's real cwd identity rather than confusing every project's
 sessions with a single `/workspace` identity. Do not run host DSH and several
 VMs concurrently against the same mutable profile: package-fallback links and
@@ -82,7 +88,7 @@ profile changes can race. Separate `DSH_HOME` values provide independent profile
 
 The runner retains a private per-cwd directory under
 `${XDG_STATE_HOME:-~/.local/state}/agent-vm/`: dedicated SSH keys, console log,
-control socket, and a 4 GiB sparse npm-cache disk. Guest root, guest Nix writes,
+control socket, and a 4 GiB sparse npm/pnpm-cache disk. Guest root, guest Nix writes,
 processes and other unshared state are otherwise ephemeral. This is **not** a
 push/pull/snapshot workflow; edits immediately affect the mounted host files.
 
@@ -268,8 +274,10 @@ loopback publication default does not hide guest SSH from other routed peers.
   for this mutable part. `latest` can itself be a release candidate. A two-line
   Node shim supplies `--expose-internals`, required by the current Cordis HMR
   dependency but missing from the published CLI's shebang.
-- **Plugins:** explicitly opt in, then update with DSH/pnpm. No unreviewed community
-  plugins are automatically installed or upgraded by this repository.
+- **Plugin:** the guest installs `dsh-context@latest` into the `web` profile once.
+  Normal restarts keep the installed version; updates are explicit and targeted
+  to `dsh-context` below. This is mutable DSH/pnpm state, not a Nix-pinned package.
+  No other third-party plugin is added or automatically upgraded.
 - **Workstation:** the root `/etc/nix` flake now also follows `nixos-unstable` and
   Home Manager `master`; CLI tools still use Nixpkgs `master`. Its existing daily
   updater refreshes those inputs and stages the tested result for next boot.
@@ -277,43 +285,43 @@ loopback publication default does not hide guest SSH from other routed peers.
   The existing separate Neovim-dotfile revision and manually packaged Element
   binary are unchanged; their documented update boundaries still apply.
 
-## Plugins worth considering
+## Included context plugin
 
-DSH is still a developer preview. Popularity is not a security audit or a promise
-of compatibility with tomorrow's `latest`. These are actual DSH plugins, not
-OpenCode plugins relabeled as DeepSeek plugins. GitHub stars checked 2026-09-06:
+[**dsh-context**](https://github.com/bowenliang123/dsh-context) is the only
+third-party plugin added by this setup. It provides the **Context** tab and
+**`/context`** command for context composition, token use and history. The guest's
+`agent.service` runs `dsh plugin --profile web add dsh-context@latest` before its
+first Web startup; no manual install or host package install is needed. Update
+the helper input and stop/restart existing VMs to pick up this setup change.
 
-| Plugin | Why consider it | Approx. repository stars |
-| --- | --- | --- |
-| [DSH better sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) | File explorer/editor, Git and terminal alongside the conversation | 3.4k |
-| [dsh-market](https://github.com/dsh-market/dsh-market) | Discover/manage plugins in the DSH settings UI | 3.3k |
-| [dsh-agent-teams](https://github.com/NanmiCoder/dsh-agent-teams) | Multi-agent delegation; add only when you need it, as it can multiply API cost | 1.4k |
-| [dsh-context](https://github.com/bowenliang123/dsh-context) | Inspect context/token use and manage context | 1.3k |
+The installed plugin and bundle registration live in the writable
+`$DSH_HOME/profiles/web`, alongside the profile's pnpm lockfile. Already-installed
+versions are left alone. An incomplete install (missing package or bundle
+registration) is retried with the profile's existing dependency spec, if any.
+Removing the required plugin causes it to be added again at the next service
+start. Existing user-installed plugins are **not removed**, and no settings,
+credentials, profile patches or other profiles are replaced. Use a separate
+`DSH_HOME` for an independent profile; don't run concurrent writers on one profile.
 
-Start with **dsh-context**, then optionally the sidebar. A marketplace and a
-multi-agent orchestrator are not necessary to make the core harness useful.
-Review their source first; native-addon build prerequisites vary. Example:
+First installation needs registry access. Failure blocks Web startup rather than
+silently omitting the plugin; inspect `journalctl -u agent -b` inside the VM.
+The DSH wrapper puts pnpm's store on `/var/cache/dsh/pnpm`: its SQLite index needs
+the guest's local cache disk, not the shared 9p filesystem. Installed packages and
+profile files remain shared. No build-script approval policy is relaxed.
+To explicitly update **only** this plugin, inside the guest:
 
 ```sh
 nix run .#agent -- ssh
-# Now INSIDE the VM, with your real DSH home mounted RW:
-dsh plugin --profile web add dsh-context@latest
-# Optional, separately reviewed:
-dsh plugin --profile web add dshmarket@latest
-systemctl restart agent
+systemctl stop agent
+dsh plugin --profile web update dsh-context@latest
+systemctl start agent
 exit
 nix run .#agent -- url         # restart creates a fresh browser launch token
 ```
 
-Use `dsh plugin --profile web update --latest` when you explicitly want to update
-installed plugins. Review pnpm's build-script approval requests rather than
-blanket-approving everything. The built-in MCP bridge can also connect to popular
-projects such as [Context7](https://github.com/upstash/context7) and
-[Playwright MCP](https://github.com/microsoft/playwright-mcp); those are separate
-MCP services, not evidence that a particular DSH adapter is widely deployed.
-The bundled Firefox **CLI + skill** above does not need Playwright MCP; use the
-separate server only if you explicitly need that interface. No host browser
-sessions, external MCP credentials or arbitrary host skill symlink targets are imported.
+DSH and this plugin remain developer-preview code, not an audited combination or
+a compatibility guarantee for tomorrow's `latest`. The Firefox CLI + skill needs
+no additional plugin or external MCP server.
 
 ## Sandbox boundary and limitations
 
@@ -349,6 +357,7 @@ sessions, external MCP credentials or arbitrary host skill symlink targets are i
 nix flake check path:/etc/nix/agent-vm --no-build
 nix build path:/etc/nix/agent-vm#checks.x86_64-linux.config \
   path:/etc/nix/agent-vm#checks.x86_64-linux.shell \
+  path:/etc/nix/agent-vm#checks.x86_64-linux.context \
   path:/etc/nix/agent-vm#checks.x86_64-linux.playwright --no-link
 # Actual offline microVM boot/mount/SSH/browser test, with a fake harness (no API calls):
 nix build path:/etc/nix/agent-vm#checks.x86_64-linux.boot --no-link
@@ -357,6 +366,11 @@ nix build path:/etc/nix/agent-vm#checks.x86_64-linux.ports --no-link
 ```
 
 The boot and port tests require KVM and nested user namespaces in the Nix build sandbox.
+The context check uses a strict offline DSH fixture to check context-only install,
+restart idempotence, preservation of existing profile data/version selections,
+incomplete-install repair, failure/retry and malformed-profile rejection. The boot
+check also verifies setup before Web startup and writable host-owned plugin state
+that survives a service restart without reinstalling.
 The Playwright check launches two real Firefox instances concurrently against a
 local HTTP fixture, checks headless/default browser selection, separate cookies,
 DOM and localStorage, screenshots, close-one/keep-one behavior and profile expiry.
@@ -370,10 +384,14 @@ Validated here: template/host/helper flake evaluation, ShellCheck, the real
 microVM offline boot/mount/ownership/isolation test, and a separate live official
 DSH Web launch with disposable config. The live check returned **401** without
 a cookie, **200** after the token exchange, and **403** for an untrusted Host;
-DSH stayed running without restarts. No real API credentials, model requests,
-community plugins, TAP network provisioning, or host activation were involved.
+DSH stayed running without restarts. That core-only check used no real API
+credentials, model requests, TAP network provisioning or host activation.
 The Firefox two-session regression also passed natively and in the real headless
 microVM, including screenshot generation and writable, non-clobbering skill seeding.
+A separate live VM check with a disposable DSH home installed only `dsh-context`,
+verified its composed bundle and authenticated HTTP **200**, then confirmed a
+service restart left the manifest/lockfile unchanged without reinstalling. No
+real credentials or model calls were used; the test VM and profile were removed.
 
 Research used the **new official wiki**, plus upstream sources:
 
@@ -392,5 +410,5 @@ Research used the **new official wiki**, plus upstream sources:
 - [Official Playwright CLI](https://github.com/microsoft/playwright-cli), its
   [session-management reference](https://github.com/microsoft/playwright-cli/blob/main/skills/playwright-cli/references/session-management.md),
   and the CLI/core implementation shipped in the locked Nixpkgs Playwright package.
-- [Awesome DSH plugins](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
-  plus the individual repositories above; no third-party plugin was installed.
+- [dsh-context](https://github.com/bowenliang123/dsh-context) — upstream install,
+  targeted update and context UI documentation.

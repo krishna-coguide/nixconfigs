@@ -31,6 +31,14 @@ unique `-s=NAME` on every command, its own `.playwright-cli/NAME/` artifacts, an
 close only its own session—never `close-all` or `kill-all`. No host browser
 profiles or display sockets are imported.
 
+The guest installs **only `dsh-context`** into the shared `web` profile before the
+first Web startup, providing the **Context** tab and **`/context`** command.
+Existing versions/settings and other user-installed plugins are preserved;
+restarts do not upgrade it. Installation needs registry access; failures appear
+in `journalctl -u agent -b` and block Web startup. To update it explicitly, use
+`dsh plugin --profile web update dsh-context@latest` inside the guest while
+`agent.service` is stopped, then start the service and request a fresh login URL.
+
 DSH resolves `@deepseek-ai/dsh@latest` inside the VM on startup. Nix packages,
 including the CLI and its matching Firefox, follow the rolling Nixpkgs input:
 `nix flake update`, then restart the VM. Merge changes to an already-seeded skill
