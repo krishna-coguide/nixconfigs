@@ -39,6 +39,14 @@ pkgs.runCommand "workstation-tools-check"
     zig version
     ruby --version
     php --version | head -1
+    socat -V
+    # fping opens ICMP sockets even for -v; physical-config checks its binary.
+    drill -v
+    tor --version
+    torsocks --version
+    printf 'socat-offline-check\n' | socat -u STDIN STDOUT | grep -qx socat-offline-check
+    torsocks curl --version
+    proxychains4 -q curl --version
     printf 'select 42;\n' | sqlite3 | grep -qx 42
     python - <<'PY'
     import importlib.util

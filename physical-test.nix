@@ -161,10 +161,60 @@ let
               ethtool
               netcat-openbsd
               socat
+              fping
+              ldns
+              torsocks
+              proxychains-ng
+              tor
             ]
           )
         && config.programs.mtr.enable;
-      message = "The VPN clients and network diagnostics must remain installed.";
+      message = "The VPN/proxy clients and network diagnostics must remain installed.";
+    }
+    {
+      assertion =
+        lib.all
+          (
+            c:
+            let
+              tor = c.services.tor;
+              unit = c.systemd.services.tor;
+            in
+            tor.enable
+            && tor.client.enable
+            && !tor.relay.enable
+            && !tor.openFirewall
+            && tor.settings.ClientOnly
+            && tor.settings.ORPort == [ ]
+            && tor.settings.DirPort == [ ]
+            && tor.settings.ExitPolicy == [ "reject *:*" ]
+            && tor.relay.onionServices == { }
+            && !tor.controlSocket.enable
+            && tor.settings.ControlPort == [ ]
+            && !tor.client.dns.enable
+            && !tor.client.transparentProxy.enable
+            && tor.settings.DNSPort == [ ]
+            && tor.settings.TransPort == [ ]
+            && builtins.length tor.settings.SOCKSPort == 1
+            && lib.all (
+              listener:
+              listener.addr == "127.0.0.1"
+              && listener.port == 9050
+              && listener.IsolateDestAddr
+              && listener.IsolateSOCKSAuth
+            ) tor.settings.SOCKSPort
+            && builtins.elem "multi-user.target" unit.wantedBy
+            && unit.serviceConfig.Restart == "always"
+            && unit.serviceConfig.RestartSec == "5s"
+            && unit.unitConfig.StartLimitIntervalSec == 0
+            && unit.serviceConfig.User == "tor"
+            && unit.serviceConfig.NoNewPrivileges
+          )
+          [
+            config
+            ec2Config
+          ];
+      message = "Both hosts need a boot-enabled, restarting, loopback-only Tor client, without relay, control, DNS or transparent-proxy listeners.";
     }
     {
       assertion =
@@ -181,8 +231,14 @@ pkgs.runCommand "physical-config-check" { } ''
   test ! -e "$sessions/wayland-sessions/plasma.desktop"
   test -f "$sessions/wayland-sessions/hyprland-uwsm.desktop"
   test ! -e "$sessions/wayland-sessions/hyprland.desktop"
-  for tool in wg wg-quick openvpn iperf3 nmap traceroute whois mtr dig tcpdump ethtool nc socat nm-connection-editor; do
+  for tool in wg wg-quick openvpn iperf3 nmap traceroute whois mtr dig tcpdump ethtool nc socat \
+    fping drill torsocks proxychains4 tor nm-connection-editor; do
     test -x "${config.system.path}/bin/$tool"
   done
+  # Validate the exact generated torrc offline without touching live Tor state.
+  mkdir -m 700 "$TMPDIR/tor"
+  ${config.services.tor.package}/bin/tor --verify-config \
+    -f ${builtins.head config.systemd.services.tor.restartTriggers} \
+    --DataDirectory "$TMPDIR/tor"
   touch "$out"
 ''

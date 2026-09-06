@@ -13,7 +13,7 @@ Flat, explicit NixOS modules with locked inputs. Required setup belongs here—n
 | `physical.nix`, `hardware-configuration.nix` | Laptop boot/storage, panel scale, CPU sensor and checkout/target identity |
 | `configuration.nix` | AWS boot/storage/network/recovery integration and checkout/target identity |
 | `users.nix` | `dev`, SSH authorization, sudo, Home Manager and workspace ownership |
-| `tools.nix`, `network.nix` | Development toolkit, terminal/shell, rootless Podman, VPN clients and network diagnostics |
+| `tools.nix`, `network.nix` | Development toolkit, terminal/shell, rootless Podman, VPN/proxy clients, local Tor service and network diagnostics |
 | `colors.nix`, `wallpaper.nix`, `wallpaper.svg` | Shared One Ring palette, hash-pinned wallpaper and original fallback artwork |
 | `desktop.nix`, `hyprland.lua`, `anyrun.css`, `swaync.css`, `desktop-help.py`, `desktop-actions.py` | Session/bar, launchers, described help, capture, clipboard, notifications, lock/idle and styling |
 | `apps.nix`, `element-nightly.nix` | Firefox ESR, KeePassXC, Thunderbird, Steam, pinned Element Nightly, Slack, file/media viewers and MIME defaults |
@@ -86,9 +86,26 @@ See [DESKTOP.md](DESKTOP.md) for the screenshot-led audit, functional coverage, 
 - **Security/backup:** age, sops, GnuPG, Gitleaks, Trivy, Cosign, Syft, Grype, step, mkcert, restic, rclone, rsync, Mosh and SSHFS. No keys, trusted CA, backup destination, schedules or scan targets are created.
 - **Diagnostics:** btop, procs, lnav, sysstat, iotop, dust/duf/ncdu, strace/lsof, NVMe/SMART/USB/PCI/sensor tools.
 - **Media/documents:** FFmpeg, ImageMagick, ExifTool, MediaInfo, Poppler utilities, Pandoc, yt-dlp, Chafa, Asciinema, VHS and archive/compression tools.
-- **Networking (`network.nix`):** WireGuard/OpenVPN, NetworkManager VPN integration on the laptop, mtr, iperf3, nmap, tcpdump/tshark, doggo/dig, iftop/bandwhich, traceroute, whois, ethtool, netcat and socat. No tunnels, peers, credentials, extra capture privileges or opened firewall ports.
+- **Networking (`network.nix`):** WireGuard/OpenVPN, NetworkManager VPN integration on the laptop, mtr, iperf3, nmap (including ncat/nping), tcpdump/tshark, doggo/dig, ldns/drill, fping, iftop/bandwhich, traceroute, whois, ethtool, netcat, socat, torsocks and proxychains-ng. Tor runs as a local client service (below). No tunnels, peers, credentials, extra capture privileges or opened firewall ports.
 
 These are system-owned executables from Nix, not unmanaged `npm -g`, `pip install --user` or `cargo install` bootstraps. Project dependencies may still be downloaded by their ordinary package managers. `nix develop` / `.envrc` remain appropriate for project-specific versions; this is not a promise that every language project uses the same global toolchain.
+
+### Local Tor client
+
+On both hosts, `network.nix` installs Tor from the **system pin** and enables `tor.service` at boot. It runs as the dedicated `tor` user with the NixOS module's sandbox and private persistent state in `/var/lib/tor`. Systemd restarts an exited daemon after five seconds without a retry limit; an explicit `systemctl stop tor` still stops it normally. A running process does not guarantee network connectivity—check for `Bootstrapped 100%` in the journal.
+
+The SOCKS listener is **`127.0.0.1:9050` only**, with destination and SOCKS-auth isolation. There is no relay/exit, onion service, control listener, transparent proxy, system DNS change or global proxy environment. Applications must opt in; installing Tor does **not** anonymize the whole machine. Prefer native SOCKS5 support with proxy-side hostname resolution (`socks5h`), for example:
+
+```sh
+systemctl status tor.service
+journalctl -u tor.service -b --no-pager
+curl --fail --show-error --max-time 60 --proxy socks5h://127.0.0.1:9050 \
+  https://check.torproject.org/api/ip
+# For compatible dynamically linked applications, explicitly wrap one command:
+torsocks curl --fail --show-error --max-time 60 https://check.torproject.org/api/ip
+```
+
+`torsocks` and `proxychains4` are opt-in wrappers, not sandboxes: static binaries and applications that bypass their hooks are not reliably covered. Tor carries TCP, not arbitrary UDP/ICMP; do not assume tools such as fping, raw-packet nmap or traceroute run through it. Keep ordinary DNS lookups out of workflows that require Tor-side resolution. Use Tor Browser separately for browser anonymity rather than treating a generic browser's proxy setting as equivalent.
 
 ## Build and apply
 
