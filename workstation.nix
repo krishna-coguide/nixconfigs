@@ -7,6 +7,8 @@
   ...
 }:
 let
+  font = builtins.head config.fonts.fontconfig.defaultFonts.monospace;
+  greeterTheme = import ./greeter-theme.nix { inherit pkgs font; };
   managedHyprlandSession =
     pkgs.runCommand "hyprland-managed-session"
       {
@@ -28,7 +30,17 @@ in
 
   services.xserver.enable = true;
   services.displayManager = {
-    sddm.enable = true;
+    sddm = {
+      enable = true;
+      package = pkgs.kdePackages.sddm; # Qt6 runtime, not the Plasma desktop.
+      theme = "sddm-astronaut-theme";
+      extraPackages = [ greeterTheme ]; # Carries the theme's Qt6 QML dependencies.
+      settings.Theme = {
+        Font = font;
+        CursorTheme = "Bibata-Modern-Ice";
+        CursorSize = 24;
+      };
+    };
     defaultSession = "hyprland-uwsm";
     # Plain Hyprland bypasses the UWSM-owned bar/idle/polkit services.
     sessionPackages = lib.mkForce [ managedHyprlandSession ];
@@ -38,7 +50,11 @@ in
   services.gvfs.enable = true;
   services.fwupd.enable = true;
   home-manager.users.dev.services.udiskie.enable = true;
-  environment.systemPackages = [ pkgs.networkmanagerapplet ];
+  environment.systemPackages = [
+    pkgs.networkmanagerapplet
+    greeterTheme
+    pkgs.bibata-cursors
+  ];
 
   hardware.bluetooth = {
     enable = true;

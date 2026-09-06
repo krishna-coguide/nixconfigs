@@ -31,7 +31,7 @@ def screenshot(name):
     # Capture through Wayland; QEMU's framebuffer dump cannot read VirGL surfaces.
     path = "/tmp/" + name + ".png"
     session("grim " + shlex.quote(path))
-    machine.copy_from_vm(path)
+    machine.copy_from_machine(path)
 
 
 def launch(name, command):
@@ -58,10 +58,21 @@ except Exception:
     raise
 
 wait_layer("ashell-main-layer")
+# A headless GPU's preferred mode is not necessarily the requested test size.
+# Fix both mode and scale before calling screenshots a 100% geometry audit.
+output = json.loads(session("hyprctl -j monitors"))[0]["name"]
+session("hyprctl eval " + shlex.quote(
+    'hl.monitor({output=' + json.dumps(output) + ',mode="1920x1080@60",position="0x0",scale=1})'
+))
+machine.wait_until_succeeds(in_session(
+    "hyprctl -j monitors | jq -e '.[0] | .width == 1920 and .height == 1080 and .scale == 1'"
+))
 screenshot("startup")
 assert session("hyprctl configerrors").strip() in ("", "ok")
-assert "JetBrainsMono" in user("fc-match 'JetBrainsMono Nerd Font'")
-assert "Inter" in user("fc-match Inter")
+for family in ["sans-serif", "serif", "monospace"]:
+    assert "JetBrainsMono" in user("fc-match " + shlex.quote(family))
+assert "Noto Color Emoji" in user("fc-match --format='%{family}' emoji")
+assert "JetBrainsMono Nerd Font 11" in user("dconf read /org/gnome/desktop/interface/font-name")
 # Pi's real --version is checked natively; avoid costly Node startup under TCG.
 user("test -x /run/current-system/sw/bin/pi")
 assert "zsh" in user("getent passwd dev")
@@ -133,8 +144,6 @@ session("swaync-client -t -sw")
 machine.sleep(1)
 screenshot("notification-100")
 
-monitors = json.loads(session("hyprctl -j monitors"))
-output = monitors[0]["name"]
 session("hyprctl eval " + shlex.quote(
     'hl.monitor({output=' + json.dumps(output) + ',mode="1920x1080@60",position="0x0",scale=1.5})'
 ))
@@ -204,5 +213,6 @@ user("test ! -e /etc/profiles/per-user/dev/share/applications/element-desktop.de
 user("grep -Eq 'fade_on_empty *= *false' ~/.config/hypr/hyprlock.conf")
 assert "libapplications.so" in user("cat ~/.config/anyrun/config.ron")
 session("hyprctl clients")
+
 machine.succeed("journalctl -b -p err --no-pager > /tmp/desktop-errors.log")
-machine.copy_from_vm("/tmp/desktop-errors.log")
+machine.copy_from_machine("/tmp/desktop-errors.log")

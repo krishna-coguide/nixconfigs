@@ -2,6 +2,7 @@
 
 let
   c = import ./colors.nix;
+  font = "JetBrainsMono Nerd Font";
   # Standalone tools from the fast-moving pin, NOT an overlay of the system's
   # Python/GCC/libraries. Desktop, drivers and NixOS services remain coherent.
   latest = import inputs.nixpkgs-latest {
@@ -229,7 +230,8 @@ in
   ]);
 
   fonts.packages = [ pkgs.nerd-fonts.jetbrains-mono ];
-  fonts.fontconfig.defaultFonts.monospace = [ "JetBrainsMono Nerd Font" ];
+  # Desktop/greeter consumers derive their font from this shared default.
+  fonts.fontconfig.defaultFonts.monospace = [ font ];
 
   home-manager.users.dev = { config, ... }: {
     programs.git = {
@@ -409,7 +411,7 @@ in
     programs.kitty = {
       enable = true;
       font = {
-        name = "JetBrainsMono Nerd Font";
+        name = font;
         size = 12;
       };
       settings = {

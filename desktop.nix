@@ -7,11 +7,15 @@
 
 let
   c = import ./colors.nix;
+  font = builtins.head config.fonts.fontconfig.defaultFonts.monospace;
+  styleTokens = c // {
+    inherit font;
+  };
   renderColors =
     text:
     builtins.replaceStrings (map (name: "@${name}@") (
-      builtins.attrNames c
-    )) (builtins.attrValues c) text;
+      builtins.attrNames styleTokens
+    )) (builtins.attrValues styleTokens) text;
   rgb = color: "rgb(${lib.removePrefix "#" color})";
   wallpaper = import ./wallpaper.nix { inherit pkgs; };
   help = pkgs.writeShellApplication {
@@ -137,17 +141,21 @@ in
   ];
   services.udev.packages = [ pkgs.brightnessctl ];
   fonts.packages = with pkgs; [
-    inter
     noto-fonts
     noto-fonts-cjk-sans
     noto-fonts-color-emoji
   ];
   fonts.fontconfig.defaultFonts = {
+    # Use the code font for generic UI/document families too, retaining
+    # international glyph fallbacks rather than replacing missing characters.
     sansSerif = [
-      "Inter"
+      font
       "Noto Sans"
     ];
-    serif = [ "Noto Serif" ];
+    serif = [
+      font
+      "Noto Serif"
+    ];
     emoji = [ "Noto Color Emoji" ];
   };
 
@@ -169,7 +177,7 @@ in
     gtk = {
       enable = true;
       font = {
-        name = "Inter";
+        name = font;
         size = 11;
       };
       theme = {
@@ -186,14 +194,19 @@ in
     qt = {
       enable = true;
       platformTheme.name = "gtk3";
+      # GTK integration also supplies the same font to Qt 5/6 applications.
       # Let Home Manager provide BOTH Qt 5 and Qt 6 style plugins.
       style.name = "adwaita-dark";
     };
-    dconf.settings."org/gnome/desktop/interface" = {
-      color-scheme = "prefer-dark";
-      font-name = "Inter 11";
-      monospace-font-name = "JetBrainsMono Nerd Font 12";
-      accent-color = "yellow";
+    dconf.settings = {
+      "org/gnome/desktop/interface" = {
+        color-scheme = "prefer-dark";
+        font-name = "${font} 11";
+        document-font-name = "${font} 11";
+        monospace-font-name = "${font} 12";
+        accent-color = "yellow";
+      };
+      "org/gnome/desktop/wm/preferences".titlebar-font = "${font} Bold 11";
     };
 
     wayland.windowManager.hyprland = {
@@ -331,7 +344,7 @@ in
           audio_indicator_format = "IconAndPercentage";
         };
         appearance = {
-          font_name = "Inter";
+          font_name = font;
           scale_factor = 1.15;
           style = "Solid";
           opacity = 1.0;
@@ -401,7 +414,7 @@ in
       enable = true;
       settings = {
         main = {
-          font = "Inter:size=11";
+          font = "${font}:size=11";
           terminal = "kitty";
           "launch-prefix" = "uwsm app --";
           "line-height" = 22;
@@ -524,7 +537,7 @@ in
             monitor = "";
             text = "cmd[update:1000] date +'%H:%M'";
             font_size = 64;
-            font_family = "Inter";
+            font_family = font;
             color = rgb c.text;
             position = "0,100";
             halign = "center";
@@ -534,7 +547,7 @@ in
             monitor = "";
             text = "$USER";
             font_size = 18;
-            font_family = "Inter";
+            font_family = font;
             color = rgb c.muted;
             position = "0,0";
             halign = "center";
@@ -551,7 +564,7 @@ in
             outline_thickness = 2;
             dots_center = true;
             fade_on_empty = false;
-            font_family = "Inter";
+            font_family = font;
             rounding = 6;
             inner_color = rgb c.surface;
             outer_color = rgb c.accent;

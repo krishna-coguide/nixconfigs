@@ -1,4 +1,4 @@
-* { font-family: Inter, sans-serif; font-size: 14px; color: @text@; }
+* { font-family: "@font@", monospace; font-size: 14px; color: @text@; }
 .control-center {
   background: @background@;
   border: 1px solid @border@;

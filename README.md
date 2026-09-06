@@ -22,7 +22,7 @@ Flat, explicit NixOS modules with locked inputs. Required setup belongs here—n
 | `switch-system.sh`, `switch-test.py` | Same installed manual apply/preview command on both hosts, with host identity supplied by Nix |
 | `physical-test.nix`, `tools-test.nix`, `git-credentials-test.nix` | Physical/AWS safety, shared-policy assertions, offline tool/help smoke tests and disposable Git credential-cache checks |
 | `desktop-test.nix`, `desktop-test.py`, `audit-desktop.sh` | Disposable graphical/PAM/audio/scaling audit |
-| `workstation.nix`, `nvidia.nix` | Shared local hardware/SDDM integration for laptop and VM; separate opt-in NVIDIA support |
+| `workstation.nix`, `greeter-theme.nix`, `appearance-test.nix`, `nvidia.nix` | Local hardware/SDDM integration, One Ring login theme and isolated rendering/font check; separate opt-in NVIDIA support |
 | [DESKTOP.md](DESKTOP.md) | Live audit, wallpaper provenance, JaKooLit comparison and explicit feature-completion plan |
 | `agent-vm/`, `templates/agent/`, [AGENT-VM.md](AGENT-VM.md) | Reusable rootless DSH microVM, shared project toolchain, live RW cwd/config/credentials/skills and access/networking guide |
 
@@ -33,6 +33,7 @@ Flat, explicit NixOS modules with locked inputs. Required setup belongs here—n
 - The physical host uses the locally established `dev` password; mutable users preserve it. No plaintext password, private key or password hash is embedded in this repo/store.
 - At the user's request, **Plasma and the previously managed `kbot` account are removed**. This configuration does not delete `/home/kbot`; retained files and old generations are not erased. Home Manager only manages `dev`.
 - SDDM exposes **Hyprland (uwsm-managed)** only. Plain Hyprland is deliberately hidden because it does not start the session-bound bar, wallpaper, idle and polkit services. UWSM is the single session owner.
+- The login greeter uses **SDDM Astronaut**, customized to the One Ring wallpaper, charcoal/parchment/gold palette, JetBrains Mono, a minimal left-hand form and matching cursor. This is a Qt6 login theme, not Plasma. PAM, passwords, session selection and the bootloader are unchanged; host autologin remains disabled.
 - Both checkouts are **dev-owned**, including Git metadata: `/etc/nix` on the laptop and `/etc/nixos` on EC2. Existing paths are retained to avoid moving deployed repositories. NixOS maintains ownership without following symlinks into the Nix store; the laptop's original `/etc/nixos` files stay untouched.
 - On EC2, AWS boot/storage/networking and SSM/SSH recovery remain intact; no physical greeter, Wi-Fi/Bluetooth or battery services are added. User settings, locale/timezone, packages and update policy come from the same modules. The graphical VM now uses the same SDDM/UWSM integration as the laptop.
 - The SSH key in `dev-authorized-keys` is public. Account/cloud/browser/VPN credentials and vaults remain user-controlled.
@@ -62,6 +63,8 @@ Flat, explicit NixOS modules with locked inputs. Required setup belongs here—n
 | `z`, `zi` | zoxide directory navigation |
 | `direnv allow` | Explicitly approve a project's `.envrc`; no automatic trust whitelist |
 | `tmux`, `zellij`, `lazygit` | Persistent terminal workspaces and Git UI; not auto-started or forced |
+
+**JetBrains Mono Nerd Font** is the shared system default for monospace, sans-serif and serif requests, GTK/Qt application UI, bar, launchers, notifications, dialogs and lock/login screens. The family is declared once in `tools.nix`; UI sizes remain 11pt where appropriate and Kitty stays 12pt. Noto fonts preserve emoji and international-character coverage. App/site-specific embedded fonts and Tor Browser's privacy defaults are not forcibly overridden; the Linux text console still uses its bitmap font.
 
 Kitty uses an opaque charcoal background, 12pt JetBrains Mono and compact padding. Font zoom remains `Ctrl-Shift-+` / `Ctrl-Shift--`; reset with `Ctrl-Shift-Backspace`. Semantic ANSI colors remain distinguishable from the gold UI accent. Neovim's own theme is unchanged.
 

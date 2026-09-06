@@ -131,7 +131,7 @@ in
     programs.zathura = {
       enable = true;
       options = {
-        font = "Inter 12";
+        font = "${builtins.head config.fonts.fontconfig.defaultFonts.monospace} 12";
         adjust-open = "best-fit";
         zoom-step = 10;
         recolor = false; # Preserve actual document colors; Ctrl-R toggles recolor.

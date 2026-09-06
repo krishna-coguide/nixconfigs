@@ -1,4 +1,4 @@
-* { font-family: Inter, sans-serif; font-size: 16px; }
+* { font-family: "@font@", monospace; font-size: 16px; }
 window { background: transparent; }
 box.main {
   padding: 12px;
