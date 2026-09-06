@@ -24,6 +24,7 @@ Flat, explicit NixOS modules with locked inputs. Required setup belongs here—n
 | `desktop-test.nix`, `desktop-test.py`, `audit-desktop.sh` | Disposable graphical/PAM/audio/scaling audit |
 | `workstation.nix`, `nvidia.nix` | Shared local hardware/SDDM integration for laptop and VM; separate opt-in NVIDIA support |
 | [DESKTOP.md](DESKTOP.md) | Live audit, wallpaper provenance, JaKooLit comparison and explicit feature-completion plan |
+| `agent-vm/`, `templates/agent/`, [AGENT-VM.md](AGENT-VM.md) | Reusable rootless DSH microVM, shared project toolchain, live RW cwd/config/credentials/skills and access/networking guide |
 
 ## Account and session
 
@@ -89,6 +90,14 @@ See [DESKTOP.md](DESKTOP.md) for the screenshot-led audit, functional coverage, 
 - **Networking (`network.nix`):** WireGuard/OpenVPN, NetworkManager VPN integration on the laptop, mtr, iperf3, nmap (including ncat/nping), tcpdump/tshark, doggo/dig, ldns/drill, fping, iftop/bandwhich, traceroute, whois, ethtool, netcat, socat, torsocks and proxychains-ng. Tor runs as a local client service (below). No tunnels, peers, credentials, extra capture privileges or opened firewall ports.
 
 These are system-owned executables from Nix, not unmanaged `npm -g`, `pip install --user` or `cargo install` bootstraps. Project dependencies may still be downloaded by their ordinary package managers. `nix develop` / `.envrc` remain appropriate for project-specific versions; this is not a promise that every language project uses the same global toolchain.
+
+### Per-project DeepSeek Harness
+
+[AGENT-VM.md](AGENT-VM.md) documents the project template and `nix run .#agent`.
+The official `dsh@latest` runs as root in a rootless microVM, with the current
+project and your standard DSH home/shared skills mounted **read-write**. Its
+host Web listener defaults to localhost; RAM, vCPUs, IPs and optional TAP
+networking are configured through Nix modules. No host service is activated.
 
 ### Local Tor client
 

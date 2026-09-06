@@ -39,6 +39,11 @@
         nixos = mkHost ./physical.nix; # This laptop's boot/storage/hardware
       };
 
+      templates.agent = {
+        path = ./templates/agent;
+        description = "Project toolchain + live-workspace DeepSeek Harness microVM";
+      };
+
       formatter.x86_64-linux = nixpkgs.legacyPackages.x86_64-linux.nixfmt;
       packages.x86_64-linux.element-nightly = import ./element-nightly.nix {
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
