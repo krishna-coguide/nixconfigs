@@ -1,5 +1,4 @@
 {
-  config,
   inputs,
   lib,
   pkgs,
@@ -8,18 +7,27 @@
 let
   latest = import inputs.nixpkgs-latest {
     inherit (pkgs.stdenv.hostPlatform) system;
-    config = pkgs.config;
+    inherit (pkgs) config;
   };
 in
 {
-  # NetworkManager owns local DNS on workstations. With dhcpcd (EC2),
-  # NixOS wires resolvconf to resolved. Preserve both hosts' existing behavior.
+  # Keep resolvectl available on both hosts. NixOS wires NetworkManager and
+  # /etc/resolv.conf to resolved; DHCP/VPNs still supply the upstream DNS.
   services.resolved = {
-    enable = lib.mkDefault (!config.networking.networkmanager.enable);
+    enable = true;
     settings.Resolve = {
       LLMNR = false;
       MulticastDNS = false;
       # Do not force public DNS, DNSSEC or DNS-over-TLS over DHCP/VPN policy.
+    };
+  };
+
+  # The NixOS module enables resolved at boot. Retry exits without a start limit.
+  systemd.services.systemd-resolved = {
+    unitConfig.StartLimitIntervalSec = 0;
+    serviceConfig = {
+      Restart = "always";
+      RestartSec = "5s";
     };
   };
 

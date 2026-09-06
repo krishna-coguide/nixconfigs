@@ -84,11 +84,38 @@ let
     {
       assertion =
         config.networking.networkmanager.enable
-        && !config.services.resolved.enable
+        && config.networking.networkmanager.dns == "systemd-resolved"
         && builtins.elem (lib.getName pkgs.networkmanager-openvpn) (
           map lib.getName config.networking.networkmanager.plugins
         );
-      message = "Keep NetworkManager/DNS and provide its OpenVPN integration.";
+      message = "Keep NetworkManager with resolved DNS and its OpenVPN integration.";
+    }
+    {
+      assertion =
+        lib.all
+          (
+            c:
+            let
+              unit = c.systemd.services.systemd-resolved;
+            in
+            c.services.resolved.enable
+            && builtins.elem "sysinit.target" unit.wantedBy
+            && builtins.elem "dbus-org.freedesktop.resolve1.service" unit.aliases
+            && unit.serviceConfig.Restart == "always"
+            && unit.serviceConfig.RestartSec == "5s"
+            && unit.unitConfig.StartLimitIntervalSec == 0
+            && !c.networking.resolvconf.enable
+            && c.networking.resolvconf.package == c.systemd.package
+            && c.environment.etc."resolv.conf".source == "/run/systemd/resolve/stub-resolv.conf"
+            && c.services.resolved.settings.Resolve.DNS == [ ]
+            && !c.services.resolved.settings.Resolve.LLMNR
+            && !c.services.resolved.settings.Resolve.MulticastDNS
+          )
+          [
+            config
+            ec2Config
+          ];
+      message = "Both hosts need boot-enabled, restarting resolved with D-Bus/stub DNS integration, without hard-coded DNS servers.";
     }
     {
       assertion =
@@ -232,7 +259,7 @@ pkgs.runCommand "physical-config-check" { } ''
   test -f "$sessions/wayland-sessions/hyprland-uwsm.desktop"
   test ! -e "$sessions/wayland-sessions/hyprland.desktop"
   for tool in wg wg-quick openvpn iperf3 nmap traceroute whois mtr dig tcpdump ethtool nc socat \
-    fping drill torsocks proxychains4 tor nm-connection-editor; do
+    fping drill torsocks proxychains4 tor nm-connection-editor resolvectl; do
     test -x "${config.system.path}/bin/$tool"
   done
   # Validate the exact generated torrc offline without touching live Tor state.

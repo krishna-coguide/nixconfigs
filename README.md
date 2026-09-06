@@ -129,6 +129,12 @@ includes **Playwright CLI + matching Firefox**, with a writable, once-seeded
 Web profile on first startup, retained on restarts and updated explicitly. No host
 service is activated.
 
+### System DNS
+
+`network.nix` enables **`systemd-resolved.service` on both hosts at boot**, with automatic restart after five seconds and no retry limit. NetworkManager supplies per-link DNS on the laptop; EC2 retains dhcpcd. NixOS connects `/etc/resolv.conf` to resolved's stub and provides the D-Bus service used by `resolvectl`. Upstream DNS still comes from DHCP/VPN configuration, not hard-coded public or private servers. An explicit `systemctl stop systemd-resolved` still stops it normally.
+
+Use `systemctl status systemd-resolved` and `resolvectl status` to inspect it. `sudo resolvectl dns krishna-laptop 192.168.1.19` sets DNS on that existing interface at runtime; it does not persist across interface recreation or reboot. Put persistent VPN DNS and any routing domains in the VPN/NetworkManager profile.
+
 ### Local Tor client
 
 On both hosts, `network.nix` installs Tor from the **system pin** and enables `tor.service` at boot. It runs as the dedicated `tor` user with the NixOS module's sandbox and private persistent state in `/var/lib/tor`. Systemd restarts an exited daemon after five seconds without a retry limit; an explicit `systemctl stop tor` still stops it normally. A running process does not guarantee network connectivity—check for `Bootstrapped 100%` in the journal.
