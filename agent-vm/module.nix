@@ -9,6 +9,7 @@ let
   cfg = config.agentVM;
   net = cfg.network;
   ipv4 = types.strMatching "[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+";
+  playwrightCli = import ./playwright.nix { inherit pkgs; };
   dshNode = pkgs.writeShellScript "dsh-node" ''
     # Cordis HMR requires this Node flag; npm's published dsh shebang omits it.
     exec node --expose-internals "$(command -v dsh)" "$@"
@@ -274,6 +275,7 @@ in
     programs.nix-ld.enable = true; # Upstream npm native executables, guest only.
     environment.systemPackages = [
       cfg.package
+      playwrightCli
     ]
     ++ cfg.packages
     ++ (with pkgs; [
@@ -336,6 +338,14 @@ in
         mkdir -p -- "$workdir"
         mountpoint -q -- "$workdir" || mount --bind /workspace "$workdir"
         git config --global --replace-all safe.directory "$workdir"
+        # Seed this new skill into the actual RW shared home once. Existing
+        # skills/user edits stay untouched, and the new file is writable, not
+        # a Nix-store symlink. GNU cp's no-overwrite creation also handles races
+        # between project VMs starting with the same shared skills directory.
+        mkdir -p /root/.agents/skills/playwright-firefox
+        cp --update=none --no-preserve=mode \
+          ${./skills/playwright-firefox/SKILL.md} \
+          /root/.agents/skills/playwright-firefox/SKILL.md
       '';
       serviceConfig = {
         User = "root";

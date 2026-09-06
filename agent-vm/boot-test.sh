@@ -2,6 +2,7 @@
 # Offline test of the real microvm.nix runner, mounts, SSH and host-side sandbox.
 set -euo pipefail
 launcher=$1
+browser_test=${2:-}
 tmp=$(mktemp -d)
 export HOME=$tmp/home DSH_HOME=$tmp/dsh DSH_AGENTS_HOME=$tmp/agents XDG_STATE_HOME=$tmp/state
 mkdir -p "$HOME" "$tmp/project" "$DSH_HOME/skills" "$DSH_AGENTS_HOME/skills"
@@ -45,11 +46,23 @@ fi
 [[ $(< "$DSH_HOME/credentials-test") == creds && $(< "$DSH_HOME/skills/test.md") == skill ]]
 [[ $(< "$DSH_AGENTS_HOME/skills/test.md") == shared ]]
 [[ $(stat -c %u changed) == "$(id -u)" ]]
-"$launcher" ssh 'command -v rg python3 git; findmnt /workspace; findmnt /root/.dsh'
+"$launcher" ssh 'command -v rg python3 git playwright-cli; findmnt /workspace; findmnt /root/.dsh'
+"$launcher" ssh 'systemctl start agent.service; test ! -e /tmp/.X11-unix/X0'
+skill="$DSH_AGENTS_HOME/skills/playwright-firefox/SKILL.md"
+grep -q '^name: playwright-firefox$' "$skill"
+[[ ! -L $skill && -w $skill && $(stat -c %a "$skill") == 600 ]]
+[[ $(stat -c %u "$skill") == "$(id -u)" ]]
+printf '\nuser customization\n' >> "$skill"
+"$launcher" ssh 'systemctl restart agent.service'
+grep -q '^user customization$' "$skill"
+if [[ -n $browser_test ]]; then
+  cp "$browser_test" ./playwright-test.sh
+  "$launcher" ssh 'bash ./playwright-test.sh'
+fi
 # A second start must fail without disrupting the existing VM.
 if "$launcher" run >/dev/null 2>&1; then echo 'Duplicate launch succeeded' >&2; exit 1; fi
 "$launcher" stop
 wait "$pid"
 trap - EXIT
 rm -rf "$tmp"
-echo 'PASS: microVM boot, root SSH, shared toolchain, RW cwd/config/creds/skills, host ownership, symlink isolation, duplicate lock, shutdown'
+echo 'PASS: microVM boot, root SSH, shared toolchain, RW cwd/config/creds/skills, writable non-clobbering skill seed, headless browser CLI, host ownership, symlink isolation, duplicate lock, shutdown'

@@ -36,6 +36,9 @@ project's original absolute path**, which exists in the guest. Then
 **Settings → Models** to configure DeepSeek, if you haven't already. Existing
 credentials/settings are reused. No API key is required merely to boot the UI.
 No model inference runs locally: the VM's RAM/CPUs are for tools/builds, not model weights.
+The VM is **headless by default**: use DSH's Web UI from your host browser; no
+VM desktop or display forwarding is started. Browser automation uses headless
+Firefox inside the VM, as described below.
 
 The template input `path:/etc/nix/agent-vm` is a local bootstrap. For collaboration
 or guest-side evaluation of the flake, replace it with your accessible Git remote,
@@ -65,6 +68,9 @@ Missing directories are created. Existing DSH home must be user-owned and privat
 `chmod 700 ~/.dsh` (or your actual `DSH_HOME`); existing credentials must be mode
 600 as DSH requires. The launcher never reads the credentials into Nix, copies
 them to the store, or replaces your settings/skills with generated content.
+The one bundled `playwright-firefox` skill is seeded into the actual shared skills
+directory only if its `SKILL.md` is absent. It is a normal writable file (0600),
+not a store symlink; existing files and user edits are never overwritten.
 
 Root inside the guest is **not host root**. QEMU/9p writes as the launching host
 user, so newly created project files belong to you. The whole DSH directory is
@@ -108,7 +114,8 @@ memory overhead beyond guest RAM.
 
 The standard guest toolkit includes Git/LFS, ripgrep, fd, Python, Node/npm/pnpm,
 jq/yq, curl/wget, common archive tools, Make, pkg-config, ShellCheck, and ordinary
-Unix inspection tools. Project versions/tools belong in `project.nix`.
+Unix inspection tools, plus the official **Playwright CLI and patched Firefox**.
+Project versions/tools belong in `project.nix`.
 
 This deliberately shares **packages and non-secret environment variables**, not
 an arbitrary shell's internals. Existing `shellHook`, `inputsFrom`, cross-compilation
@@ -116,6 +123,57 @@ setup hooks, library search paths and background dev services are not magically
 converted into NixOS configuration. Factor tools/env into the shared attrset;
 configure required guest services through `modules`. Do not put credentials in
 `project.env`. Build outputs/package definitions can use the same `pkgs` input.
+
+## Firefox automation and subagent sessions
+
+DSH discovers the bundled [playwright-firefox skill](agent-vm/skills/playwright-firefox/SKILL.md)
+from `/root/.agents/skills/playwright-firefox/SKILL.md`, which is the live host
+`${DSH_AGENTS_HOME:-~/.agents}/skills/playwright-firefox/SKILL.md`. No changes to
+`settings.yaml`, credentials, plugins or external MCP configuration are needed.
+Ask DSH/subagents to use **playwright-firefox** for browser tasks.
+
+The `playwright-cli` executable uses the official CLI shipped in Playwright core
+(`playwright-core cli`), with its matching Nixpkgs Firefox and rendering fonts.
+It defaults to **Firefox, headless, nonpersistent profiles**. This avoids an
+independently updated npm CLI demanding a different browser revision, or trying
+to automate ordinary Firefox without Playwright's Juggler support. CLI, patched
+browser and dependencies advance together with the consuming flake's Nixpkgs
+input; no handwritten Playwright version/hash or runtime browser download.
+
+Each subagent must use its own unique name and artifact directory. For example,
+inside the guest, from the same project cwd throughout:
+
+```sh
+# Parent-assigned examples: give each task a different suffix.
+PLAYWRIGHT_MCP_OUTPUT_DIR="$PWD/.playwright-cli/login-a1b2c3d4" \
+  playwright-cli -s=login-a1b2c3d4 open http://127.0.0.1:3000 --browser=firefox
+PLAYWRIGHT_MCP_OUTPUT_DIR="$PWD/.playwright-cli/search-e5f6a7b8" \
+  playwright-cli -s=search-e5f6a7b8 open http://127.0.0.1:3000 --browser=firefox
+playwright-cli -s=login-a1b2c3d4 snapshot
+playwright-cli -s=search-e5f6a7b8 eval 'document.title'
+playwright-cli list
+playwright-cli -s=login-a1b2c3d4 close   # leaves the other subagent alone
+playwright-cli -s=search-e5f6a7b8 close
+```
+
+Cookies, DOM, tabs and storage are independent between named sessions. This is
+**not a security boundary** between root-running subagents. The skill requires
+explicit `-s=` on every browser command, unique per-task output paths, modest
+parallelism (normally two browsers with 4 GiB RAM), and scoped cleanup. It forbids
+`close-all`, `kill-all`, global process killing and accidental use of the default
+session. Profiles are ephemeral unless persistence is explicitly requested;
+screenshots/traces/auth-state exports can contain secrets. New templates ignore
+`.playwright-cli/`; add that ignore rule to existing projects too.
+
+The application server must run **inside the VM** for guest `127.0.0.1` URLs.
+Headed operation is opt-in (`open --headed`) and needs a separately configured
+guest display; the default VM provides none and never mounts your host desktop.
+Do not import your normal browser profile or install another browser/CLI with npm.
+
+After updating the helper input, stop/restart the project VM to get the new tools
+and initial skill. Existing skill edits deliberately survive restarts and updates;
+merge later changes from the repository's skill file yourself rather than silently
+replacing local instructions. This does not restart an already-running VM.
 
 ## Networking: bind address versus VM interface
 
@@ -238,8 +296,9 @@ blanket-approving everything. The built-in MCP bridge can also connect to popula
 projects such as [Context7](https://github.com/upstash/context7) and
 [Playwright MCP](https://github.com/microsoft/playwright-mcp); those are separate
 MCP services, not evidence that a particular DSH adapter is widely deployed.
-Playwright needs its browsers/dependencies inside the guest. No browser sessions,
-external MCP credentials or arbitrary host skill symlink targets are imported.
+The bundled Firefox **CLI + skill** above does not need Playwright MCP; use the
+separate server only if you explicitly need that interface. No host browser
+sessions, external MCP credentials or arbitrary host skill symlink targets are imported.
 
 ## Sandbox boundary and limitations
 
@@ -274,12 +333,19 @@ external MCP credentials or arbitrary host skill symlink targets are imported.
 ```sh
 nix flake check path:/etc/nix/agent-vm --no-build
 nix build path:/etc/nix/agent-vm#checks.x86_64-linux.config \
-  path:/etc/nix/agent-vm#checks.x86_64-linux.shell --no-link
-# Actual offline microVM boot/mount/SSH test, with a fake harness (no API calls):
+  path:/etc/nix/agent-vm#checks.x86_64-linux.shell \
+  path:/etc/nix/agent-vm#checks.x86_64-linux.playwright --no-link
+# Actual offline microVM boot/mount/SSH/browser test, with a fake harness (no API calls):
 nix build path:/etc/nix/agent-vm#checks.x86_64-linux.boot --no-link
 ```
 
 The boot test requires KVM and nested user namespaces in the Nix build sandbox.
+The Playwright check launches two real Firefox instances concurrently against a
+local HTTP fixture, checks headless/default browser selection, separate cookies,
+DOM and localStorage, screenshots, close-one/keep-one behavior and profile expiry.
+The boot check runs it inside the guest too, and checks writable skill seeding,
+host ownership and preservation of a user edit across a harness restart. No live
+websites, real credentials or model calls are used.
 A real `dsh@latest` Web startup additionally requires network access and is not
 silently replaced by the fake harness in normal usage.
 
@@ -289,6 +355,8 @@ DSH Web launch with disposable config. The live check returned **401** without
 a cookie, **200** after the token exchange, and **403** for an untrusted Host;
 DSH stayed running without restarts. No real API credentials, model requests,
 community plugins, TAP network provisioning, or host activation were involved.
+The Firefox two-session regression also passed natively and in the real headless
+microVM, including screenshot generation and writable, non-clobbering skill seeding.
 
 Research used the **new official wiki**, plus upstream sources:
 
@@ -304,5 +372,8 @@ Research used the **new official wiki**, plus upstream sources:
   [skill paths](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/skill/skill-filesystem/README.md),
   [browser auth](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/connection/README.md),
   [safety notice](https://github.com/deepseek-ai/deepseek-harness/blob/master/SAFETY.md).
+- [Official Playwright CLI](https://github.com/microsoft/playwright-cli), its
+  [session-management reference](https://github.com/microsoft/playwright-cli/blob/main/skills/playwright-cli/references/session-management.md),
+  and the CLI/core implementation shipped in the locked Nixpkgs Playwright package.
 - [Awesome DSH plugins](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
   plus the individual repositories above; no third-party plugin was installed.

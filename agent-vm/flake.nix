@@ -31,7 +31,10 @@
       lib.mkAgentVM = import ./lib.nix { inherit nixpkgs microvm; };
       nixosModules.agent = ./module.nix;
       nixosConfigurations.agent = example.nixos;
-      packages.${system}.default = example.package;
+      packages.${system} = {
+        default = example.package;
+        playwright-cli = import ./playwright.nix { inherit pkgs; };
+      };
       apps.${system}.default = example.app;
       formatter.${system} = pkgs.nixfmt;
       checks.${system} = import ./tests.nix { inherit inputs pkgs example; };

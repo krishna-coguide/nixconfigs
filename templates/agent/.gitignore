@@ -4,3 +4,4 @@ result-*
 .env.*
 *.qcow2
 *.img
+.playwright-cli/

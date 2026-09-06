@@ -18,8 +18,18 @@ private (`chmod 700 ~/.dsh`). Credentials, settings, profiles and skills are liv
 shared files, not copied into the Nix store. Select the project's original
 absolute path in the DSH UI; `/workspace` is also an alias.
 
-DSH resolves `@deepseek-ai/dsh@latest` inside the VM on startup. Nix packages
-follow the rolling Nixpkgs input: `nix flake update`, then restart the VM.
+The VM stays **headless by default**. It includes `playwright-cli` and matching
+Playwright-patched Firefox for browser automation. The `playwright-firefox` skill
+is seeded once into your actual shared skills directory as a writable file;
+existing skills/user edits are not overwritten. Ask each subagent to use its own
+unique `-s=NAME` on every command, its own `.playwright-cli/NAME/` artifacts, and
+close only its own session—never `close-all` or `kill-all`. No host browser
+profiles or display sockets are imported.
+
+DSH resolves `@deepseek-ai/dsh@latest` inside the VM on startup. Nix packages,
+including the CLI and its matching Firefox, follow the rolling Nixpkgs input:
+`nix flake update`, then restart the VM. Merge changes to an already-seeded skill
+manually if you want the newer instructions; local edits are preserved.
 
 See `/etc/nix/AGENT-VM.md` for the full guide and security boundaries. The reusable
 input lives at `/etc/nix/agent-vm`; replace the local input with your Git remote

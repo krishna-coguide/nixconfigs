@@ -51,6 +51,10 @@ in
     assert c.systemd.services.agent.serviceConfig.WorkingDirectory == "/workspace";
     assert c.services.openssh.settings.PasswordAuthentication == false;
     assert c.services.openssh.settings.AllowAgentForwarding == false;
+    assert !c.services.xserver.enable;
+    assert !c.services.displayManager.enable;
+    assert builtins.elem inputs.self.packages.${pkgs.stdenv.hostPlatform.system}.playwright-cli
+      c.environment.systemPackages;
     assert builtins.length c.microvm.forwardPorts == 1;
     assert (builtins.head c.microvm.forwardPorts).host.address == "127.0.0.1";
     assert builtins.elem pkgs.hello c.environment.systemPackages;
@@ -70,9 +74,25 @@ in
         ];
       }
       ''
-        shellcheck -s bash ${./launch.sh} ${./boot-test.sh}
+        shellcheck -s bash ${./launch.sh} ${./boot-test.sh} ${./playwright-test.sh}
         bash -n ${./launch.sh}
         touch "$out"
+      '';
+
+  playwright =
+    pkgs.runCommand "agent-playwright-firefox-check"
+      {
+        nativeBuildInputs = [
+          inputs.self.packages.${pkgs.stdenv.hostPlatform.system}.playwright-cli
+          pkgs.nodejs
+          pkgs.jq
+          pkgs.coreutils
+          pkgs.gnugrep
+        ];
+      }
+      ''
+        export PLAYWRIGHT_TEST_OUTPUT="$out"
+        bash ${./playwright-test.sh}
       '';
 
   boot =
@@ -86,7 +106,7 @@ in
         ];
       }
       ''
-        bash ${./boot-test.sh} ${testVM.package}/bin/agent-vm
+        bash ${./boot-test.sh} ${testVM.package}/bin/agent-vm ${./playwright-test.sh}
         touch "$out"
       '';
 }
