@@ -11,6 +11,18 @@
   ];
 
   nixpkgs.hostPlatform = "x86_64-linux";
+  nixpkgs.overlays = [
+    (_final: prev: {
+      # Pi is a fast-moving agent harness; stable branches can be generations old.
+      # Use the latest resolving Nixpkgs input while keeping the rest of the
+      # system on the stable release branch.
+      pi-coding-agent =
+        (import inputs.nixpkgs-latest {
+          inherit (prev.stdenv.hostPlatform) system;
+          config = prev.config or { };
+        }).pi-coding-agent;
+    })
+  ];
 
   nix = {
     channel.enable = false;

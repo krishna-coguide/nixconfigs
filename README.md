@@ -17,7 +17,7 @@ Flat, explicit NixOS modules, with locked inputs. Required machine setup belongs
 | `desktop.nix`, `hyprland.lua`, `anyrun.css`, `wallpaper.svg` | Hyprland/UWSM, bar, launcher, original wallpaper, notifications, lock/idle, PipeWire and desktop styling |
 | `apps.nix` | Firefox ESR, KeePassXC, Thunderbird, Steam, Element, Slack and Zathura |
 | `workstation.nix`, `nvidia.nix` | Separately selected physical-workstation/greeter and NVIDIA integration; not enabled on EC2 |
-| `updates.nix`, `update-system.sh` | Daily stable-input updates in an isolated Git worktree; validated commits, no forced reboot or GC |
+| `updates.nix`, `update-system.sh` | Daily package-input updates in an isolated Git worktree; validated commits, no forced reboot or GC |
 | `desktop-test.nix`, `desktop-test.py`, `audit-desktop.sh`, `update-test.py` | Disposable graphical audit and updater failure/concurrency tests |
 | `network.nix` | WireGuard/OpenVPN clients and network diagnostics; optional resolved, host-owned interface management |
 | `neovim.nix`, `neovim-test.lua` | Editor, unchanged upstream dotfile deployment and opt-in native runtime audit |
@@ -62,12 +62,12 @@ From an administrator shell:
 
 ```sh
 cd /etc/nix
-nix --extra-experimental-features 'nix-command flakes' flake check --no-build --no-update-lock-file
-nix --extra-experimental-features 'nix-command flakes' build \
+nix flake check --no-build --no-update-lock-file
+nix build \
   .#checks.x86_64-linux.physical-config \
   .#checks.x86_64-linux.updates .#checks.x86_64-linux.desktop-config \
   --no-update-lock-file --no-link
-nix --extra-experimental-features 'nix-command flakes' build \
+nix build \
   .#nixosConfigurations.nixos.config.system.build.toplevel \
   --no-update-lock-file --out-link result-nixos
 built=$(readlink -f result-nixos)
@@ -132,7 +132,7 @@ nix --extra-experimental-features 'nix-command flakes' build \
   .#nixosConfigurations.dev.config.system.build.toplevel --no-update-lock-file
 ```
 
-Then review/apply the resulting closure as above. The configuration creates `dev`, sets permissions and deploys its files. **No separate Neovim clone, copy, useradd, chown or global Git-config recipe is required.**
+Then review/apply the resulting closure as above. The configuration creates `dev`, sets permissions and deploys its files. **No separate Neovim clone, copy, useradd, chown or global Git-config recipe is required.** After either host configuration is active, `nix-command` and `flakes` are system defaults through `nix.settings.experimental-features`; the temporary flag is only for bootstrapping older bases that cannot read flakes yet.
 
 This host build does not use a mutable channel. NixOS's native flake integration pins the `nixpkgs` registry entry and login-shell `<nixpkgs>` lookup to the system input; the global `nix-path` setting keeps the same pin when `NIX_PATH` is unset. Old root channel profiles are retained for recovery, not used as build inputs. Dev-environment templates/composition remain deferred; there is no flake framework here.
 
@@ -159,8 +159,8 @@ Make focused changes, format/evaluate them, and commit regularly. Build and acti
 
 ## Updates and safety
 
-- **EC2 only:** `nixos-update.timer` checks daily with up to one hour of jitter. Only the stable Nixpkgs/Home Manager branches advance; Neovim's source stays fixed. The updater skips a dirty repository, builds in a detached worktree, records a tested commit and applies it without rebooting. It attempts rollback if activation fails and retains recovery generations. Inspect `journalctl -u nixos-update` or trigger it with `sudo systemctl start nixos-update`.
-- For a manual input refresh: `nix flake update nixpkgs home-manager`, review `flake.lock`, then check/build. The exact resolved revisions and hashes remain committed.
+- **EC2 only:** `nixos-update.timer` checks daily with up to one hour of jitter. Nixpkgs/Home Manager release branches and the latest developer-tool package input advance; Neovim's source stays fixed. The updater skips a dirty repository, builds in a detached worktree, records a tested commit and applies it without rebooting. It attempts rollback if activation fails and retains recovery generations. Inspect `journalctl -u nixos-update` or trigger it with `sudo systemctl start nixos-update`.
+- For a manual input refresh: `nix flake update nixpkgs home-manager nixpkgs-latest`, review `flake.lock`, then check/build. The exact resolved revisions and hashes remain committed.
 - Keep the EC2 module on the EC2 target only. Preserve sandboxing, signature verification and each host's recovery access.
 - `system.stateVersion` and `home.stateVersion` are both `26.05`; these preserve compatibility, not package versions.
 - `test` activates changes too; it is not a dry run. Keep the original system generation.

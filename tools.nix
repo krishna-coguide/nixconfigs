@@ -11,6 +11,7 @@ in
 
   environment.systemPackages = with pkgs; [
     nixfmt
+    # Overridden in common.nix to stay current beyond stable release lag.
     pi-coding-agent
     # Runtime build prerequisites for the unchanged Lazy/Mason plugin workflow.
     gcc
