@@ -90,8 +90,10 @@ trap 'exit 143' TERM
 # Network is intentionally inherited for API access (not an egress firewall).
 devices=()
 [[ $AGENT_NETWORK != tap ]] || devices=(--dev-bind /dev/net/tun /dev/net/tun)
-bwrap "${devices[@]}" --die-with-parent --new-session --unshare-user --unshare-pid --unshare-ipc \
-  --unshare-uts --unshare-cgroup-try --cap-drop ALL --clearenv \
+# Map the caller to namespace uid/gid 0 so 9p ownership matches guest root.
+# Host writes still belong to the caller; no host-root identity/capability is gained.
+bwrap "${devices[@]}" --die-with-parent --new-session --unshare-user --uid 0 --gid 0 \
+  --unshare-pid --unshare-ipc --unshare-uts --unshare-cgroup-try --cap-drop ALL --clearenv \
   --setenv HOME /tmp --setenv PATH /no-host-path --setenv LANG C.UTF-8 \
   --ro-bind /nix/store /nix/store --proc /proc --dev /dev --dev-bind /dev/kvm /dev/kvm \
   --tmpfs /tmp --bind "$state" /state --bind "$project" /workspace \

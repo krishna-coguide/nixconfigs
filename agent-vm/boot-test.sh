@@ -47,14 +47,24 @@ fi
 [[ $(< "$DSH_AGENTS_HOME/skills/test.md") == shared ]]
 [[ $(stat -c %u changed) == "$(id -u)" ]]
 "$launcher" ssh 'command -v rg python3 git playwright-cli; findmnt /workspace; findmnt /root/.dsh'
+# pnpm's atomic saves preserve ownership; these chowns must work over 9p.
+"$launcher" ssh 'chown 0:0 /root/.dsh/config-test; chown --reference=/root/.dsh/config-test /root/.dsh/credentials-test'
 "$launcher" ssh 'systemctl start agent.service; test ! -e /tmp/.X11-unix/X0'
 skill="$DSH_AGENTS_HOME/skills/playwright-firefox/SKILL.md"
 grep -q '^name: playwright-firefox$' "$skill"
 [[ ! -L $skill && -w $skill && $(stat -c %a "$skill") == 600 ]]
 [[ $(stat -c %u "$skill") == "$(id -u)" ]]
 printf '\nuser customization\n' >> "$skill"
+manifest="$DSH_HOME/profiles/web/package.json"
+[[ $(< "$DSH_HOME/plugin-calls") == 'plugin --profile web add dsh-context@latest' ]]
+[[ -f $DSH_HOME/profiles/web/node_modules/dsh-context/package.json ]]
+[[ ! -L $manifest && -w $manifest && $(stat -c %a "$manifest") == 600 ]]
+[[ $(stat -c %u "$manifest") == "$(id -u)" ]]
+cp "$manifest" "$tmp/installed.json"
 "$launcher" ssh 'systemctl restart agent.service'
 grep -q '^user customization$' "$skill"
+[[ $(wc -l < "$DSH_HOME/plugin-calls") == 1 ]]
+cmp "$manifest" "$tmp/installed.json"
 if [[ -n $browser_test ]]; then
   cp "$browser_test" ./playwright-test.sh
   "$launcher" ssh 'bash ./playwright-test.sh'
@@ -65,4 +75,4 @@ if "$launcher" run >/dev/null 2>&1; then echo 'Duplicate launch succeeded' >&2; 
 wait "$pid"
 trap - EXIT
 rm -rf "$tmp"
-echo 'PASS: microVM boot, root SSH, shared toolchain, RW cwd/config/creds/skills, writable non-clobbering skill seed, headless browser CLI, host ownership, symlink isolation, duplicate lock, shutdown'
+echo 'PASS: microVM boot, root SSH, shared toolchain, RW cwd/config/creds/skills, writable non-clobbering skill seed, context-only plugin setup preserved on restart, headless browser CLI, host ownership, symlink isolation, duplicate lock, shutdown'

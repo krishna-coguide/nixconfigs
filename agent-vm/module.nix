@@ -22,6 +22,8 @@ let
     ];
     text = ''
       export npm_config_cache=/var/cache/dsh/npm
+      # pnpm's SQLite index needs a local filesystem, not the shared 9p mount.
+      export pnpm_config_store_dir=/var/cache/dsh/pnpm
       # Explicitly rolling upstream, not a pretend-reproducible Nix derivation.
       exec npm exec --yes --package=@deepseek-ai/dsh@latest -- ${dshNode} "$@"
     '';
@@ -356,6 +358,8 @@ in
         cp --update=none --no-preserve=mode \
           ${./skills/playwright-firefox/SKILL.md} \
           /root/.agents/skills/playwright-firefox/SKILL.md
+        # Required plugin setup uses the mounted profile, never the host or store.
+        ${pkgs.bash}/bin/bash ${./context.sh} ${cfg.package}/bin/dsh
       '';
       serviceConfig = {
         User = "root";
@@ -387,6 +391,8 @@ in
                 ) (map (port: "${net.hostAddress}:${toString port}") (lib.range net.webPort net.webPortEnd))
               )
         );
+        # First-time DSH/plugin downloads run in ExecStartPre, not at Nix build time.
+        TimeoutStartSec = "10min";
         Restart = "on-failure";
         RestartSec = 3;
         UMask = "0077";

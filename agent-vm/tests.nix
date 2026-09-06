@@ -5,6 +5,7 @@
 }:
 let
   c = example.nixos.config;
+  fakeDsh = pkgs.writeShellScriptBin "dsh" (builtins.readFile ./fake-dsh.sh);
   testVM = inputs.self.lib.mkAgentVM {
     system = pkgs.stdenv.hostPlatform.system;
     project = {
@@ -15,12 +16,7 @@ let
       {
         # Offline infrastructure test. A real DSH startup is tested separately;
         # @latest needs the network and is intentionally outside Nix reproducibility.
-        agentVM.package = pkgs.writeShellScriptBin "dsh" ''
-          exec ${pkgs.nodejs}/bin/node -e '
-            require("node:http").createServer((req, res) => res.end("agent-vm-test"))
-              .listen(3080, "127.0.0.1", () => console.log("http://127.0.0.1:3080/?token=offline-test"));
-          '
-        '';
+        agentVM.package = fakeDsh;
       }
     ];
   };
@@ -74,6 +70,10 @@ in
     assert c.microvm.storeOnDisk;
     assert c.systemd.services.agent.serviceConfig.User == "root";
     assert c.systemd.services.agent.serviceConfig.WorkingDirectory == "/workspace";
+    assert pkgs.lib.hasInfix
+      (builtins.unsafeDiscardStringContext "${./context.sh} ${c.agentVM.package}/bin/dsh")
+      c.systemd.services.agent.preStart;
+    assert c.systemd.services.agent.serviceConfig.TimeoutStartSec == "10min";
     assert c.services.openssh.settings.PasswordAuthentication == false;
     assert c.services.openssh.settings.AllowAgentForwarding == false;
     assert !c.services.xserver.enable;
@@ -99,8 +99,23 @@ in
         ];
       }
       ''
-        shellcheck -s bash ${./launch.sh} ${./boot-test.sh} ${./playwright-test.sh} ${./port-test.sh}
+        shellcheck -s bash ${./launch.sh} ${./boot-test.sh} ${./playwright-test.sh} ${./port-test.sh} \
+          ${./context.sh} ${./context-test.sh} ${./fake-dsh.sh}
         bash -n ${./launch.sh}
+        touch "$out"
+      '';
+
+  context =
+    pkgs.runCommand "agent-dsh-context-check"
+      {
+        nativeBuildInputs = [
+          pkgs.bash
+          pkgs.coreutils
+          pkgs.jq
+        ];
+      }
+      ''
+        bash ${./context-test.sh} ${./context.sh} ${fakeDsh}/bin/dsh
         touch "$out"
       '';
 
