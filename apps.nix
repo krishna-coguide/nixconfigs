@@ -1,5 +1,6 @@
 {
   config,
+  inputs,
   lib,
   pkgs,
   ...
@@ -7,6 +8,11 @@
 
 let
   c = import ./colors.nix;
+  # Tauon follows the fast-moving pin without overlaying the system libraries.
+  latest = import inputs.nixpkgs-latest {
+    inherit (pkgs.stdenv.hostPlatform) system;
+    config = pkgs.config;
+  };
   elementNightly = import ./element-nightly.nix { inherit pkgs; };
   browserAddon = pkgs.fetchurl {
     name = "keepassxc-browser-1.10.3.xpi";
@@ -106,11 +112,17 @@ in
       thunderbird
       file-roller
       imv
+      latest.tauon
       # Electron does not reliably detect a keyring under Hyprland. Use the
       # KeePassXC Secret Service explicitly; never fall back to basic_text.
       elementNightly
       slack
     ];
+    # Fix the pinned package's stale launcher command, preserving its metadata.
+    xdg.dataFile."applications/tauonmb.desktop".source = pkgs.runCommand "tauonmb.desktop" { } ''
+      substitute ${latest.tauon}/share/applications/tauonmb.desktop "$out" \
+        --replace-quiet 'Exec=tauonmb ' 'Exec=${lib.getExe latest.tauon} '
+    '';
     programs.mpv = {
       enable = true;
       config = {

@@ -16,7 +16,7 @@ Flat, explicit NixOS modules with locked inputs. Required setup belongs here—n
 | `tools.nix`, `network.nix` | Development toolkit, terminal/shell, rootless Podman, VPN/proxy clients, local Tor service and network diagnostics |
 | `colors.nix`, `wallpaper.nix`, `wallpaper.svg` | Shared One Ring palette, hash-pinned wallpaper and original fallback artwork |
 | `desktop.nix`, `hyprland.lua`, `anyrun.css`, `swaync.css`, `desktop-help.py`, `desktop-actions.py` | Session/bar, launchers, described help, capture, clipboard, notifications, lock/idle and styling |
-| `apps.nix`, `element-nightly.nix` | Firefox ESR, Tor Browser, KeePassXC, Thunderbird, Steam, pinned Element Nightly, Slack, file/media viewers and MIME defaults |
+| `apps.nix`, `element-nightly.nix` | Firefox ESR, Tor Browser, KeePassXC, Thunderbird, Steam, pinned Element Nightly, Slack, Tauon, file/media viewers and MIME defaults |
 | `neovim.nix`, `neovim-test.lua` | Unmodified upstream editor deployment and opt-in native runtime audit |
 | `updates.nix`, `update-system.sh`, `update-test.py` | Shared dev-owned checkouts, daily boot-staged updates and failure/concurrency regression tests |
 | `switch-system.sh`, `switch-test.py` | Same installed manual apply/preview command on both hosts, with host identity supplied by Nix |
@@ -241,6 +241,12 @@ sudo less /var/cache/nixos-update/last-success
 Manual refresh: `nix flake update nixpkgs home-manager nixpkgs-latest`, review `flake.lock`, then check/build. `system.stateVersion` / `home.stateVersion` remain `26.05`: they govern compatibility, not package freshness. Channels are disabled; the Nixpkgs registry and `<nixpkgs>` lookup follow the locked system input.
 
 ## Editor and application data
+
+**Tauon** is installed for `dev` from `nixpkgs-latest` (Nixpkgs master), with the
+exact snapshot recorded in `flake.lock`. The current pin provides **12.0.0**,
+matching the latest upstream stable release when added. It advances through the
+existing daily input-update workflow. Launch `tauon` or choose **Tauon**
+in the application launcher after applying; existing MIME defaults are unchanged.
 
 Neovim imports [the existing neovim-dots source](https://git.cyber.ayyalasomayajula.net/marsultor/neovim-dots), pinned to `380eb86778a7c53a0f1c18e84f14037456155347`. Lua, AstroNvim, Lazy, Mason, plugins and keymaps are unchanged. No Nixvim, replacement loader or plugin-manager migration.
 

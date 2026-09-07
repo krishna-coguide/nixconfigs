@@ -10,7 +10,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Fast-moving developer tools can advance ahead of the tested channel.
+    # Fast-moving standalone apps/tools can advance ahead of the tested channel.
     # flake.lock still records the exact resolved snapshot.
     nixpkgs-latest.url = "github:NixOS/nixpkgs/master";
 
