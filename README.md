@@ -39,6 +39,13 @@ Flat, explicit NixOS modules with locked inputs. Required setup belongs here—n
 - On EC2, AWS boot/storage/networking and SSM/SSH recovery remain intact; no physical greeter, Wi-Fi/Bluetooth or battery services are added. User settings, locale/timezone, packages and update policy come from the same modules. The graphical VM now uses the same SDDM/UWSM integration as the laptop.
 - The SSH key in `dev-authorized-keys` is public. Account/cloud/browser/VPN credentials and vaults remain user-controlled.
 
+When entering `dev` from root, use **`su - dev`**, not `su dev`: a non-login
+switch can inherit root's `/run/user/0` runtime and D-Bus address. Zsh drops an
+inherited runtime directory owned by another user and its matching bus address.
+For an already-open affected shell, run
+`unset XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS ZELLIJ_SOCKET_DIR` before Zellij.
+Never change permissions on `/run/user/0` to work around this.
+
 ### Everyday controls
 
 | Key / command | Action |
