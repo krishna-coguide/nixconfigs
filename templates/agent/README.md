@@ -48,6 +48,39 @@ For tools that need writable caches, use a location inside the project, e.g.
 in Git. Do not grant the entire home write access just to fix a cache error.
 Bwrap's `/tmp` is temporary; keep artifacts needed across calls in the workspace.
 
+## Opt in to a `0.0.0.0` listener from the CLI
+
+The current alpha **rejects the literal `--host 0.0.0.0` flag**, even though its
+HTTP server supports that address in configuration. Without patching DSH or
+adding a wrapper, use its native **`--patch` CLI argument** instead. Copy the
+optional [`web-network.patch.yml`](web-network.patch.yml) beside your project
+flake, then run:
+
+```sh
+npm exec --yes --prefer-online --package=@deepseek-ai/dsh@alpha --call \
+  'node --expose-internals "$(command -v dsh)" web --patch ./web-network.patch.yml --no-open --port 3080 --trusted-host dsh.example.test:3080'
+```
+
+Replace `dsh.example.test:3080` with the actual DNS name or IP and port you use
+in the browser; do not use `0.0.0.0`, a URL or a wildcard as a trusted host.
+Repeat `--trusted-host` for additional names. DSH also automatically trusts the
+server's detected LAN IPv4 addresses on this bind. `--port 0` still selects a
+free port; in that case a port-less trusted host allows the selected port.
+
+This binds **all IPv4 interfaces for this invocation only**. Without `--patch`,
+the normal command stays on loopback. `--host 127.0.0.1` can also override the
+patch back to loopback. Keep `--patch` before the Web app flags. Use the printed
+LAN login URL, or replace the loopback host in the login URL with your trusted
+server address while retaining its token and actual port.
+
+**Deliberate network exposure:** API authentication and Host/Origin checks stay
+enabled, but not every static or plugin route is authenticated, and DSH serves
+plain HTTP, not TLS. A trusted host is a browser authority check, **not a client
+IP allowlist**. Restrict access with a private VPN, firewall/security group or
+an appropriately secured HTTPS reverse proxy; do not expose this directly to
+the public Internet. No firewall/security-group rules are changed here. On an
+untrusted network, prefer the loopback command with SSH forwarding instead.
+
 ## Which plugin, and what it actually guarantees
 
 Research checked npm **2026-09-12**, the **`alpha` channel** (then

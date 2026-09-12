@@ -123,8 +123,10 @@ writing your project flake. It is just a `devShell` with Node, Bubblewrap and
 example project tools—no VM, launcher, helper input or service. The
 [setup and sandbox guide](templates/agent/README.md) gives the direct upstream
 **DSH `@alpha`** command (fresh alpha-channel metadata on each launch) and
-migration instructions. `tools.nix` also installs Bubblewrap on
-both hosts.
+migration instructions. For an opt-in `0.0.0.0` listener, use the documented
+`--patch ./web-network.patch.yml` CLI argument; upstream alpha rejects the literal
+`--host 0.0.0.0` flag. Normal startup remains loopback-only. `tools.nix` also
+installs Bubblewrap on both hosts.
 
 DSH already bundles the official `@deepseek-ai/dsh-sandbox-local`, policy,
 sandboxed Bash and filesystem plugins. Linux prefers **bwrap**, with Landlock as

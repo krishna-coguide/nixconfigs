@@ -3,6 +3,8 @@
 # Inside nix develop, run the rolling alpha channel (see README.md for boundaries):
 # npm exec --yes --prefer-online --package=@deepseek-ai/dsh@alpha --call \
 #   'node --expose-internals "$(command -v dsh)" web --no-open --host 127.0.0.1 --port 3080'
+# For all IPv4 interfaces: replace --host 127.0.0.1 with --patch ./web-network.patch.yml
+# and add --trusted-host YOUR_SERVER:3080 (see the optional patch and README.md).
 {
   description = "Example project shell for DeepSeek Harness with Bubblewrap";
 
