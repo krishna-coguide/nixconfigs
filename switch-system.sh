@@ -9,7 +9,7 @@ usage() {
   printf 'Usage: %s [switch|dry-activate|boot|test]\n' "$0"
   printf 'Build %s#%s using flake.lock.\n' "$repo" "${host:-<host>}"
   printf '%s\n' \
-    'NIXOS_UPDATE_HOST is required: nixos = physical laptop; dev = EC2.' \
+    'NIXOS_UPDATE_HOST is required: select a target from hosts.nix.' \
     'NIXOS_CONFIG_REPO selects the checkout (default: /etc/nix).' \
     'Default: switch now and save for boot (an explicit manual action).' \
     'dry-activate previews changes; boot stages them; test applies temporarily.' \
@@ -33,18 +33,13 @@ case "$action" in
     ;;
 esac
 
-case "$host" in
-  '')
-    printf '%s\n' 'Set NIXOS_UPDATE_HOST explicitly: nixos = physical laptop; dev = EC2.' \
-      'Refusing to guess the host from the login name or use laptop boot/storage by default.' >&2
-    exit 2
-    ;;
-  nixos | dev) ;;
-  *)
-    printf 'Unsupported host: %s\n' "$host" >&2
-    exit 2
-    ;;
-esac
+# Permit new hosts without editing this script; reject selector/path injection.
+# Nix rejects a well-formed but nonexistent flake target before any activation.
+if [[ ! $host =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]]; then
+  printf '%s\n' 'Set NIXOS_UPDATE_HOST to an explicit target from hosts.nix (letters, digits, _ or -; not a leading digit).' \
+    'Refusing an empty/invalid target; never guessing from the login name.' >&2
+  exit 2
+fi
 
 # Keep builds/Git access under the checkout owner, including when invoked via sudo.
 # Only activating the built system needs root.

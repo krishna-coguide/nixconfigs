@@ -8,10 +8,10 @@ Flat, explicit NixOS modules with locked inputs. Required setup belongs here—n
 
 | File | Owns |
 | --- | --- |
-| `flake.nix`, `flake.lock` | Host entry points, exact Nixpkgs/Home Manager/tool/dotfile revisions and hashes |
+| `hosts.nix`, `flake.nix`, `flake.lock` | Machine entry table, host construction and exact Nixpkgs/Home Manager/tool/dotfile pins |
 | `common.nix` | Shared environment, locale/timezone, Nix features, update policy and compatibility version |
-| `physical.nix`, `hardware-configuration.nix` | Laptop boot/storage, panel scale, CPU sensor and checkout/target identity |
-| `configuration.nix` | AWS boot/storage/network/recovery integration and checkout/target identity |
+| `physical.nix`, `hardware-configuration.nix` | Laptop boot/storage, panel scale and CPU sensor; deployment identity comes from `hosts.nix` |
+| `configuration.nix` | AWS boot/storage/network/recovery integration; deployment identity comes from `hosts.nix` |
 | `users.nix` | `dev`, SSH authorization, sudo, Home Manager and workspace ownership |
 | `tools.nix`, `network.nix` | Development toolkit, terminal/shell, rootless Podman, VPN/proxy clients, local Tor service and network diagnostics |
 | `colors.nix`, `wallpaper.nix`, `wallpaper.svg` | Shared One Ring palette, hash-pinned wallpaper and original fallback artwork |
@@ -22,7 +22,8 @@ Flat, explicit NixOS modules with locked inputs. Required setup belongs here—n
 | `switch-system.sh`, `switch-test.py` | Same installed manual apply/preview command on both hosts, with host identity supplied by Nix |
 | `physical-test.nix`, `tools-test.nix`, `git-credentials-test.nix` | Physical/AWS safety, shared-policy assertions, offline tool/help smoke tests and disposable Git credential-cache checks |
 | `desktop-test.nix`, `desktop-test.py`, `audit-desktop.sh` | Disposable graphical/PAM/audio/scaling audit |
-| `workstation.nix`, `greeter-theme.nix`, `appearance-test.nix`, `nvidia.nix` | Local hardware/SDDM integration, One Ring login theme and isolated rendering/font check; separate opt-in NVIDIA support |
+| `workstation.nix`, `greeter-theme.nix`, `appearance-test.nix` | Local hardware/SDDM integration, One Ring login theme and isolated rendering/font check |
+| `nvidia.nix`, `cuda.nix`, `cuda-check.cu`, [NVIDIA.md](NVIDIA.md) | Opt-in proprietary NVIDIA driver, installed CUDA SDK/cuDNN, Podman CDI and GPU setup guide |
 | [DESKTOP.md](DESKTOP.md) | Live audit, wallpaper provenance, JaKooLit comparison and explicit feature-completion plan |
 | [`templates/agent/`](templates/agent/README.md), `agent-template-test.nix` | Copyable DSH devShell example, built-in Bubblewrap sandbox guide and offline example check |
 
@@ -116,6 +117,23 @@ To forget all cached Git HTTPS credentials immediately:
 git credential-cache exit
 ```
 
+### NVIDIA / CUDA and additional machines
+
+Add `./nvidia.nix` to a GPU machine's `modules` in **`hosts.nix`**. This installs
+NVIDIA's stable proprietary driver, **`nvidia-smi`, `nvcc`, cuda-gdb,
+compute-sanitizer, CUDA libraries/headers, cuDNN and nvtop**, plus CDI support for
+rootless Podman. The driver follows the system kernel/pin; CUDA does not cause
+global CUDA-enabled rebuilds of unrelated applications. Non-GPU hosts remain
+unchanged. Blackwell+ requires `hardware.nvidia.open = true`; older cards and
+hybrid laptops need the native overrides described in [NVIDIA.md](NVIDIA.md).
+
+`hosts.nix` is also the entry point for a new machine: give it its own hardware
+module, platform and checkout path, not this laptop's disk UUIDs. Its attribute
+name becomes the exact build/update target. See [NVIDIA.md](NVIDIA.md) for
+examples, staging/reboot instructions and verification. `nix develop .#cuda`
+provides the matching development environment; `nix run .#cuda-check` launches
+a small real kernel and checks its result (requires an accessible GPU).
+
 ### Per-project DeepSeek Harness
 
 Copy or borrow from [`templates/agent/flake.nix`](templates/agent/flake.nix) when
@@ -170,7 +188,7 @@ switch-system dry-activate  # build and preview changes without applying
 switch-system boot          # stage for the next boot instead
 ```
 
-Nix supplies the correct checkout/target to the **same script** on each host. Builds run as `dev`; only activation uses sudo. It applies the exact built output, including `dev`'s Home Manager configuration, shares the automatic updater's lock, stops on build failure, keeps recovery generations and never reboots. It does **not** pull Git or update `flake.lock`: “latest” means the current checkout. Add new source files to Git for flakes to include them. Open a new terminal afterward for shell environment changes; some desktop changes require a fresh login. `--help` lists the modes, including temporary `test` activation.
+`hosts.nix` supplies the correct checkout/target to the **same script** on each host. Builds run as `dev`; only activation uses sudo. It applies the exact built output, including `dev`'s Home Manager configuration, shares the automatic updater's lock, stops on build failure, keeps recovery generations and never reboots. It does **not** pull Git or update `flake.lock`: “latest” means the current checkout. Add new source files to Git for flakes to include them. Open a new terminal afterward for shell environment changes; some desktop changes require a fresh login. `--help` lists the modes, including temporary `test` activation.
 
 Direct source-script execution **requires `NIXOS_UPDATE_HOST`**; an unset or empty value is rejected before building or using sudo. It never selects a host from your login name. Set `NIXOS_CONFIG_REPO` to the checkout you actually intend to build (the source-script default is `/etc/nix`). For an **EC2 checkout at `/etc/nix`**:
 

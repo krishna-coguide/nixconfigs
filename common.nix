@@ -1,5 +1,10 @@
 # Shared user environment and update policy; only machine integration differs.
-{ config, inputs, ... }:
+{
+  config,
+  inputs,
+  lib,
+  ...
+}:
 {
   imports = [
     ./users.nix
@@ -18,7 +23,6 @@
     variant = "";
   };
 
-  nixpkgs.hostPlatform = "x86_64-linux";
   # tools.nix/network.nix select current standalone CLIs without overriding the
   # system package set (or mixing unstable libraries into the desktop stack).
 
@@ -34,6 +38,7 @@
 
   system.configurationRevision = inputs.self.rev or inputs.self.dirtyRev or null;
 
-  # Initial data/default compatibility, not the desired package release.
-  system.stateVersion = "26.05";
+  # Preserve a new machine's explicitly chosen/generated compatibility version.
+  # Existing hosts retain 26.05; this is not the desired package release.
+  system.stateVersion = lib.mkDefault "26.05";
 }

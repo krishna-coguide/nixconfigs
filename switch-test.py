@@ -82,12 +82,12 @@ with tempfile.TemporaryDirectory(prefix="switch-test-") as directory:
              (["switch", "extra"], None, "invalid", 2),
              ([], None, "build-failure", 42), ([], "switch", "sudo-failure", 43),
              ([], "switch", "activation-failure", 44), ([], None, "invalid-host", 2)]
-    for host in ["nixos", "dev"]:
+    for host in ["nixos", "dev", "gpu-worker_1"]:
         for args, action, scenario, expected_code in cases:
             calls.unlink(missing_ok=True)
             result = subprocess.run(
                 ["bash", str(script), *args], cwd=root,
-                env=env | {"NIXOS_UPDATE_HOST": "unknown" if scenario == "invalid-host" else host,
+                env=env | {"NIXOS_UPDATE_HOST": "bad/host" if scenario == "invalid-host" else host,
                            "SCENARIO": scenario}, text=True, capture_output=True,
             )
             assert result.returncode == expected_code, (host, scenario, result.stdout, result.stderr)
