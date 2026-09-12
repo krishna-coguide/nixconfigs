@@ -24,7 +24,7 @@ Flat, explicit NixOS modules with locked inputs. Required setup belongs here—n
 | `desktop-test.nix`, `desktop-test.py`, `audit-desktop.sh` | Disposable graphical/PAM/audio/scaling audit |
 | `workstation.nix`, `greeter-theme.nix`, `appearance-test.nix`, `nvidia.nix` | Local hardware/SDDM integration, One Ring login theme and isolated rendering/font check; separate opt-in NVIDIA support |
 | [DESKTOP.md](DESKTOP.md) | Live audit, wallpaper provenance, JaKooLit comparison and explicit feature-completion plan |
-| `agent-vm/`, `templates/agent/`, [AGENT-VM.md](AGENT-VM.md) | Reusable rootless DSH microVM, shared project toolchain, live RW cwd/config/credentials/skills and access/networking guide |
+| [`templates/agent/`](templates/agent/README.md), `agent-template-test.nix` | Copyable DSH devShell example, built-in Bubblewrap sandbox guide and offline example check |
 
 ## Account and session
 
@@ -118,16 +118,20 @@ git credential-cache exit
 
 ### Per-project DeepSeek Harness
 
-[AGENT-VM.md](AGENT-VM.md) documents the project template and `nix run .#agent`.
-The official `dsh@latest` runs as root in a rootless microVM, with the current
-project and your standard DSH home/shared skills mounted **read-write**. Its
-host Web listener defaults to localhost on the first free port in **3080–3100**;
-RAM, vCPUs, IPs and optional TAP networking are configured through Nix modules. The VM is headless by default and
-includes **Playwright CLI + matching Firefox**, with a writable, once-seeded
-`playwright-firefox` skill for isolated named sessions across subagents.
-**`dsh-context` is the only added third-party plugin**: installed into the shared
-Web profile on first startup, retained on restarts and updated explicitly. No host
-service is activated.
+Copy or borrow from [`templates/agent/flake.nix`](templates/agent/flake.nix) when
+writing your project flake. It is just a `devShell` with Node, Bubblewrap and
+example project tools—no VM, launcher, helper input or service. The
+[setup and sandbox guide](templates/agent/README.md) gives the direct upstream
+**DSH `@alpha`** command (fresh alpha-channel metadata on each launch) and
+migration instructions. `tools.nix` also installs Bubblewrap on
+both hosts.
+
+DSH already bundles the official `@deepseek-ai/dsh-sandbox-local`, policy,
+sandboxed Bash and filesystem plugins. Linux prefers **bwrap**, with Landlock as
+an upstream fallback; the example selects `workspace-write`. **This is write
+confinement, not VM isolation:** readable host files, credentials, network and
+host sockets are not hidden. Keep Permissions at `workspace-write` + approval,
+review escalations, and do not run as root or start from your whole home.
 
 ### System DNS
 

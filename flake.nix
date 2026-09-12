@@ -41,7 +41,7 @@
 
       templates.agent = {
         path = ./templates/agent;
-        description = "Project toolchain + live-workspace DeepSeek Harness microVM";
+        description = "Copyable project devShell example for DeepSeek Harness with Bubblewrap";
       };
 
       formatter.x86_64-linux = nixpkgs.legacyPackages.x86_64-linux.nixfmt;
@@ -62,6 +62,7 @@
           pkgs = nixpkgs.legacyPackages.x86_64-linux;
         in
         {
+          agent-template = import ./agent-template-test.nix { inherit pkgs; };
           desktop = import ./desktop-test.nix { inherit inputs pkgs; };
           appearance = import ./appearance-test.nix {
             inherit pkgs;

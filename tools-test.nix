@@ -9,7 +9,7 @@ pkgs.runCommand "workstation-tools-check"
     export HOME="$TMPDIR/home"
     mkdir -p "$HOME"
     export PATH=${config.system.path}/bin:$PATH
-    for tool in pi git git-lfs gh glab cmake ninja gdb \
+    for tool in pi bwrap git git-lfs gh glab cmake ninja gdb \
       cargo rustc rustfmt cargo-clippy cargo-nextest go gopls dlv uv ruff pyright \
       node pnpm tsc biome bun deno shellcheck shfmt just hyperfine watchexec \
       nom nvd nix-tree nix-diff statix deadnix nixd \
@@ -31,6 +31,7 @@ pkgs.runCommand "workstation-tools-check"
     switch-system --help > "$TMPDIR/switch-help"
     grep -Fq '/etc/nix#nixos' "$TMPDIR/switch-help"
     pi --version
+    bwrap --version
     uv --version
     ruff --version
     cargo --version

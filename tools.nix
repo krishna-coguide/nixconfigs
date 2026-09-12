@@ -26,6 +26,8 @@ in
 
   environment.systemPackages = [
     pkgs.nixfmt
+    # DSH's built-in sandbox-local prefers bwrap; no setuid wrapper or service.
+    pkgs.bubblewrap
   ]
   ++ (with latest; [
     pi-coding-agent
