@@ -2,7 +2,7 @@
 
 Flat, explicit NixOS modules with locked inputs. Required setup belongs here—not in manual package installs, copied dotfiles or an extra framework.
 
-**Select the host, not the login name:** `nixosConfigurations.nixos` is this physical UEFI/NVMe laptop; `nixosConfigurations.dev` is EC2 only. Both use the `dev` account. Never activate the EC2 closure on the laptop.
+**Select the host, not the login name:** `nixosConfigurations.nixos` is this physical UEFI/NVMe laptop; `nixosConfigurations.dev` is EC2 only. Both use the `dev` account. Never activate the EC2 closure on the laptop or the laptop closure on EC2.
 
 ## Layout
 
@@ -166,7 +166,18 @@ switch-system boot          # stage for the next boot instead
 
 Nix supplies the correct checkout/target to the **same script** on each host. Builds run as `dev`; only activation uses sudo. It applies the exact built output, including `dev`'s Home Manager configuration, shares the automatic updater's lock, stops on build failure, keeps recovery generations and never reboots. It does **not** pull Git or update `flake.lock`: “latest” means the current checkout. Add new source files to Git for flakes to include them. Open a new terminal afterward for shell environment changes; some desktop changes require a fresh login. `--help` lists the modes, including temporary `test` activation.
 
-Direct `/etc/nix/switch-system.sh` execution still defaults to the laptop. When running the source script on EC2 before the packaged command is installed, explicitly set `NIXOS_CONFIG_REPO=/etc/nixos NIXOS_UPDATE_HOST=dev` and choose `boot`. Automatic updates, unlike an explicit manual switch, **always stage for the next boot on both hosts**.
+Direct source-script execution **requires `NIXOS_UPDATE_HOST`**; an unset or empty value is rejected before building or using sudo. It never selects a host from your login name. Set `NIXOS_CONFIG_REPO` to the checkout you actually intend to build (the source-script default is `/etc/nix`). For an **EC2 checkout at `/etc/nix`**:
+
+```sh
+cd /etc/nix
+NIXOS_CONFIG_REPO="$PWD" NIXOS_UPDATE_HOST=dev ./switch-system.sh dry-activate
+# After reviewing the preview, stage without changing the running system:
+NIXOS_CONFIG_REPO="$PWD" NIXOS_UPDATE_HOST=dev ./switch-system.sh boot
+```
+
+Use `switch` instead of `boot` only when you intend to apply immediately. On the **laptop**, use `NIXOS_UPDATE_HOST=nixos`. EC2's installed command and updater still use `/etc/nixos#dev`; running the source script from `/etc/nix` does not change that deployment path. Automatic updates, unlike an explicit manual switch, **always stage for the next boot on both hosts**.
+
+If EC2 reports `efiSysMountPoint = '/boot' is not a mounted partition` after building `#nixos`, the wrong host was selected: `physical.nix` expects the laptop's EFI partition and Btrfs UUIDs, while `configuration.nix` retains EC2's GRUB and ext4 storage. Do not format or invent an EFI partition to work around it. Select `#dev` and inspect the system profile as described under Recovery; a failed bootloader installation can still leave the wrong generation selected.
 
 ### Detailed validation and activation
 
@@ -210,6 +221,15 @@ Keep existing generations. Inspect what is actually selected and booted:
 readlink -f /run/current-system /run/booted-system /nix/var/nix/profiles/system
 sudo nix-env --profile /nix/var/nix/profiles/system --list-generations
 ```
+
+If a wrong-host switch failed during bootloader installation, `/nix/var/nix/profiles/system` may point at that failed generation even though `/run/current-system` and the installed boot menu still reference the working system. To stage the **currently running** closure again without a live activation or reboot:
+
+```sh
+current=$(readlink -f /run/current-system)
+sudo "$current/sw/bin/nixos-rebuild" boot --no-reexec --store-path "$current"
+```
+
+This does update the system profile and boot menu; inspect the links first and retain the known-good generations. Alternatively, build/preview and successfully stage the correct host target.
 
 To restore the booted closure temporarily from the retained console:
 

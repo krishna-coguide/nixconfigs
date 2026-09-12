@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # The installed command gets its host/path from updates.nix on both machines.
-# Direct execution from this checkout defaults to the laptop, never the login name.
+# Direct execution requires an explicit host: both machines use the dev account.
 set -euo pipefail
 repo=${NIXOS_CONFIG_REPO:-/etc/nix}
-host=${NIXOS_UPDATE_HOST:-nixos}
+host=${NIXOS_UPDATE_HOST:-}
 
 usage() {
   printf 'Usage: %s [switch|dry-activate|boot|test]\n' "$0"
-  printf 'Build %s#%s using flake.lock.\n' "$repo" "$host"
+  printf 'Build %s#%s using flake.lock.\n' "$repo" "${host:-<host>}"
   printf '%s\n' \
+    'NIXOS_UPDATE_HOST is required: nixos = physical laptop; dev = EC2.' \
+    'NIXOS_CONFIG_REPO selects the checkout (default: /etc/nix).' \
     'Default: switch now and save for boot (an explicit manual action).' \
     'dry-activate previews changes; boot stages them; test applies temporarily.' \
     'Does not pull Git, update package pins, delete generations, or reboot.'
@@ -32,6 +34,11 @@ case "$action" in
 esac
 
 case "$host" in
+  '')
+    printf '%s\n' 'Set NIXOS_UPDATE_HOST explicitly: nixos = physical laptop; dev = EC2.' \
+      'Refusing to guess the host from the login name or use laptop boot/storage by default.' >&2
+    exit 2
+    ;;
   nixos | dev) ;;
   *)
     printf 'Unsupported host: %s\n' "$host" >&2

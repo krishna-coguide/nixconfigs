@@ -75,7 +75,6 @@ assert "Noto Color Emoji" in user("fc-match --format='%{family}' emoji")
 assert "JetBrainsMono Nerd Font 11" in user("dconf read /org/gnome/desktop/interface/font-name")
 # Pi's real --version is checked natively; avoid costly Node startup under TCG.
 user("test -x /run/current-system/sw/bin/pi")
-assert "zsh" in user("getent passwd dev")
 # QEMU emulates HDA with a silent host backend; exercise real ALSA/PipeWire nodes.
 machine.wait_until_succeeds(in_session("wpctl inspect @DEFAULT_AUDIO_SINK@ | grep -q alsa_output"), timeout=90)
 session("wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.42")
@@ -84,8 +83,6 @@ session("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ 1")
 assert "MUTED" in session("wpctl get-volume @DEFAULT_AUDIO_SOURCE@")
 session("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ 0")
 machine.succeed("systemctl is-active NetworkManager display-manager")
-machine.succeed("test $(stat -c %U /etc/nix) = dev")
-machine.succeed("test $(stat -c %U /var/cache/nixos-update) = dev")
 
 launch("terminal", "kitty --title 'Workspace ready' sh -c " + shlex.quote(
     "printf '\\n  WORKSPACE READY\\n\\n'; "

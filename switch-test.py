@@ -53,6 +53,29 @@ with tempfile.TemporaryDirectory(prefix="switch-test-") as directory:
     env = dict(os.environ, PATH=str(binaries) + os.pathsep + os.environ["PATH"],
                NIXOS_CONFIG_REPO=str(repo), CACHE_DIRECTORY=str(root / "cache"),
                CALLS=str(calls), BUILT=str(root / "built system"))
+    # Source execution must never infer a target from the login name or silently
+    # choose laptop boot/storage on EC2. Help still works before configuration.
+    for host in [None, ""]:
+        for login in ["dev", "nixos", "root"]:
+            for args in [[], ["dry-activate"], ["boot"], ["test"], ["switch"], ["--help"], ["-h"]]:
+                calls.unlink(missing_ok=True)
+                guard_env = env | {"USER": login, "LOGNAME": login,
+                                   "CACHE_DIRECTORY": str(root / "unconfigured-cache")}
+                guard_env.pop("NIXOS_UPDATE_HOST", None)
+                if host is not None:
+                    guard_env["NIXOS_UPDATE_HOST"] = host
+                result = subprocess.run(
+                    ["bash", str(script), *args], cwd=root, env=guard_env,
+                    text=True, capture_output=True,
+                )
+                help_requested = args in (["--help"], ["-h"])
+                assert result.returncode == (0 if help_requested else 2), (
+                    host, login, args, result.stdout, result.stderr)
+                assert "NIXOS_UPDATE_HOST" in (result.stdout if help_requested else result.stderr)
+                assert not calls.exists(), calls.read_text()
+                assert not Path(guard_env["CACHE_DIRECTORY"]).exists()
+                print("PASS", "unset-host" if host is None else "empty-host", login, args or ["default"])
+
     cases = [([], "switch", "success", 0), (["dry-activate"], "dry-activate", "success", 0),
              (["boot"], "boot", "success", 0), (["test"], "test", "success", 0),
              (["--help"], None, "help", 0), (["invalid"], None, "invalid", 2),
