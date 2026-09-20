@@ -2,16 +2,16 @@
 
 Flat, explicit NixOS modules with locked inputs. Required setup belongs here—not in manual package installs, copied dotfiles or an extra framework.
 
-**Select the host, not the login name:** `nixosConfigurations.nixos` is this physical UEFI/NVMe laptop; `nixosConfigurations.dev` is EC2 only. Both use the `dev` account. Never activate the EC2 closure on the laptop.
+**Select the host, not the login name:** `nixosConfigurations.nixos` is this physical UEFI/NVMe laptop; `nixosConfigurations.dev` is EC2 only. Both use the `dev` account. Never activate the EC2 closure on the laptop or the laptop closure on EC2.
 
 ## Layout
 
 | File | Owns |
 | --- | --- |
-| `flake.nix`, `flake.lock` | Host entry points, exact Nixpkgs/Home Manager/tool/dotfile revisions and hashes |
+| `hosts.nix`, `flake.nix`, `flake.lock` | Machine entry table, host construction and exact Nixpkgs/Home Manager/tool/dotfile pins |
 | `common.nix` | Shared environment, locale/timezone, Nix features, update policy and compatibility version |
-| `physical.nix`, `hardware-configuration.nix` | Laptop boot/storage, panel scale, CPU sensor and checkout/target identity |
-| `configuration.nix` | AWS boot/storage/network/recovery integration and checkout/target identity |
+| `physical.nix`, `hardware-configuration.nix` | Laptop boot/storage, panel scale and CPU sensor; deployment identity comes from `hosts.nix` |
+| `configuration.nix` | AWS boot/storage/network/recovery integration; deployment identity comes from `hosts.nix` |
 | `users.nix` | `dev`, SSH authorization, sudo, Home Manager and workspace ownership |
 | `tools.nix`, `network.nix` | Development toolkit, terminal/shell, rootless Podman, VPN/proxy clients, local Tor service and network diagnostics |
 | `colors.nix`, `wallpaper.nix`, `wallpaper.svg` | Shared One Ring palette, hash-pinned wallpaper and original fallback artwork |
@@ -22,9 +22,10 @@ Flat, explicit NixOS modules with locked inputs. Required setup belongs here—n
 | `switch-system.sh`, `switch-test.py` | Same installed manual apply/preview command on both hosts, with host identity supplied by Nix |
 | `physical-test.nix`, `tools-test.nix`, `git-credentials-test.nix` | Physical/AWS safety, shared-policy assertions, offline tool/help smoke tests and disposable Git credential-cache checks |
 | `desktop-test.nix`, `desktop-test.py`, `audit-desktop.sh` | Disposable graphical/PAM/audio/scaling audit |
-| `workstation.nix`, `greeter-theme.nix`, `appearance-test.nix`, `nvidia.nix` | Local hardware/SDDM integration, One Ring login theme and isolated rendering/font check; separate opt-in NVIDIA support |
+| `workstation.nix`, `greeter-theme.nix`, `appearance-test.nix` | Local hardware/SDDM integration, One Ring login theme and isolated rendering/font check |
+| `nvidia.nix`, `cuda.nix`, `cuda-check.cu`, [NVIDIA.md](NVIDIA.md) | Opt-in proprietary NVIDIA driver, installed CUDA SDK/cuDNN, Podman CDI and GPU setup guide |
 | [DESKTOP.md](DESKTOP.md) | Live audit, wallpaper provenance, JaKooLit comparison and explicit feature-completion plan |
-| `agent-vm/`, `templates/agent/`, [AGENT-VM.md](AGENT-VM.md) | Reusable rootless DSH microVM, shared project toolchain, live RW cwd/config/credentials/skills and access/networking guide |
+| [`templates/agent/`](templates/agent/README.md), `agent-template-test.nix` | Copyable DSH devShell example, built-in Bubblewrap sandbox guide and offline example check |
 
 ## Account and session
 
@@ -37,6 +38,13 @@ Flat, explicit NixOS modules with locked inputs. Required setup belongs here—n
 - Both checkouts are **dev-owned**, including Git metadata: `/etc/nix` on the laptop and `/etc/nixos` on EC2. Existing paths are retained to avoid moving deployed repositories. NixOS maintains ownership without following symlinks into the Nix store; the laptop's original `/etc/nixos` files stay untouched.
 - On EC2, AWS boot/storage/networking and SSM/SSH recovery remain intact; no physical greeter, Wi-Fi/Bluetooth or battery services are added. User settings, locale/timezone, packages and update policy come from the same modules. The graphical VM now uses the same SDDM/UWSM integration as the laptop.
 - The SSH key in `dev-authorized-keys` is public. Account/cloud/browser/VPN credentials and vaults remain user-controlled.
+
+When entering `dev` from root, use **`su - dev`**, not `su dev`: a non-login
+switch can inherit root's `/run/user/0` runtime and D-Bus address. Zsh drops an
+inherited runtime directory owned by another user and its matching bus address.
+For an already-open affected shell, run
+`unset XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS ZELLIJ_SOCKET_DIR` before Zellij.
+Never change permissions on `/run/user/0` to work around this.
 
 ### Everyday controls
 
@@ -116,18 +124,41 @@ To forget all cached Git HTTPS credentials immediately:
 git credential-cache exit
 ```
 
+### NVIDIA / CUDA and additional machines
+
+Add `./nvidia.nix` to a GPU machine's `modules` in **`hosts.nix`**. This installs
+NVIDIA's stable proprietary driver, **`nvidia-smi`, `nvcc`, cuda-gdb,
+compute-sanitizer, CUDA libraries/headers, cuDNN and nvtop**, plus CDI support for
+rootless Podman. The driver follows the system kernel/pin; CUDA does not cause
+global CUDA-enabled rebuilds of unrelated applications. Non-GPU hosts remain
+unchanged. Blackwell+ requires `hardware.nvidia.open = true`; older cards and
+hybrid laptops need the native overrides described in [NVIDIA.md](NVIDIA.md).
+
+`hosts.nix` is also the entry point for a new machine: give it its own hardware
+module, platform and checkout path, not this laptop's disk UUIDs. Its attribute
+name becomes the exact build/update target. See [NVIDIA.md](NVIDIA.md) for
+examples, staging/reboot instructions and verification. `nix develop .#cuda`
+provides the matching development environment; `nix run .#cuda-check` launches
+a small real kernel and checks its result (requires an accessible GPU).
+
 ### Per-project DeepSeek Harness
 
-[AGENT-VM.md](AGENT-VM.md) documents the project template and `nix run .#agent`.
-The official `dsh@latest` runs as root in a rootless microVM, with the current
-project and your standard DSH home/shared skills mounted **read-write**. Its
-host Web listener defaults to localhost on the first free port in **3080–3100**;
-RAM, vCPUs, IPs and optional TAP networking are configured through Nix modules. The VM is headless by default and
-includes **Playwright CLI + matching Firefox**, with a writable, once-seeded
-`playwright-firefox` skill for isolated named sessions across subagents.
-**`dsh-context` is the only added third-party plugin**: installed into the shared
-Web profile on first startup, retained on restarts and updated explicitly. No host
-service is activated.
+Copy or borrow from [`templates/agent/flake.nix`](templates/agent/flake.nix) when
+writing your project flake. It is just a `devShell` with Node, Bubblewrap and
+example project tools—no VM, launcher, helper input or service. The
+[setup and sandbox guide](templates/agent/README.md) gives the direct upstream
+**DSH `@alpha`** command (fresh alpha-channel metadata on each launch) and
+migration instructions. For an opt-in `0.0.0.0` listener, use the documented
+`--patch ./web-network.patch.yml` CLI argument; upstream alpha rejects the literal
+`--host 0.0.0.0` flag. Normal startup remains loopback-only. `tools.nix` also
+installs Bubblewrap on both hosts.
+
+DSH already bundles the official `@deepseek-ai/dsh-sandbox-local`, policy,
+sandboxed Bash and filesystem plugins. Linux prefers **bwrap**, with Landlock as
+an upstream fallback; the example selects `workspace-write`. **This is write
+confinement, not VM isolation:** readable host files, credentials, network and
+host sockets are not hidden. Keep Permissions at `workspace-write` + approval,
+review escalations, and do not run as root or start from your whole home.
 
 ### System DNS
 
@@ -164,9 +195,20 @@ switch-system dry-activate  # build and preview changes without applying
 switch-system boot          # stage for the next boot instead
 ```
 
-Nix supplies the correct checkout/target to the **same script** on each host. Builds run as `dev`; only activation uses sudo. It applies the exact built output, including `dev`'s Home Manager configuration, shares the automatic updater's lock, stops on build failure, keeps recovery generations and never reboots. It does **not** pull Git or update `flake.lock`: “latest” means the current checkout. Add new source files to Git for flakes to include them. Open a new terminal afterward for shell environment changes; some desktop changes require a fresh login. `--help` lists the modes, including temporary `test` activation.
+`hosts.nix` supplies the correct checkout/target to the **same script** on each host. Builds run as `dev`; only activation uses sudo. It applies the exact built output, including `dev`'s Home Manager configuration, shares the automatic updater's lock, stops on build failure, keeps recovery generations and never reboots. It does **not** pull Git or update `flake.lock`: “latest” means the current checkout. Add new source files to Git for flakes to include them. Open a new terminal afterward for shell environment changes; some desktop changes require a fresh login. `--help` lists the modes, including temporary `test` activation.
 
-Direct `/etc/nix/switch-system.sh` execution still defaults to the laptop. When running the source script on EC2 before the packaged command is installed, explicitly set `NIXOS_CONFIG_REPO=/etc/nixos NIXOS_UPDATE_HOST=dev` and choose `boot`. Automatic updates, unlike an explicit manual switch, **always stage for the next boot on both hosts**.
+Direct source-script execution **requires `NIXOS_UPDATE_HOST`**; an unset or empty value is rejected before building or using sudo. It never selects a host from your login name. Set `NIXOS_CONFIG_REPO` to the checkout you actually intend to build (the source-script default is `/etc/nix`). For an **EC2 checkout at `/etc/nix`**:
+
+```sh
+cd /etc/nix
+NIXOS_CONFIG_REPO="$PWD" NIXOS_UPDATE_HOST=dev ./switch-system.sh dry-activate
+# After reviewing the preview, stage without changing the running system:
+NIXOS_CONFIG_REPO="$PWD" NIXOS_UPDATE_HOST=dev ./switch-system.sh boot
+```
+
+Use `switch` instead of `boot` only when you intend to apply immediately. On the **laptop**, use `NIXOS_UPDATE_HOST=nixos`. EC2's installed command and updater still use `/etc/nixos#dev`; running the source script from `/etc/nix` does not change that deployment path. Automatic updates, unlike an explicit manual switch, **always stage for the next boot on both hosts**.
+
+If EC2 reports `efiSysMountPoint = '/boot' is not a mounted partition` after building `#nixos`, the wrong host was selected: `physical.nix` expects the laptop's EFI partition and Btrfs UUIDs, while `configuration.nix` retains EC2's GRUB and ext4 storage. Do not format or invent an EFI partition to work around it. Select `#dev` and inspect the system profile as described under Recovery; a failed bootloader installation can still leave the wrong generation selected.
 
 ### Detailed validation and activation
 
@@ -210,6 +252,15 @@ Keep existing generations. Inspect what is actually selected and booted:
 readlink -f /run/current-system /run/booted-system /nix/var/nix/profiles/system
 sudo nix-env --profile /nix/var/nix/profiles/system --list-generations
 ```
+
+If a wrong-host switch failed during bootloader installation, `/nix/var/nix/profiles/system` may point at that failed generation even though `/run/current-system` and the installed boot menu still reference the working system. To stage the **currently running** closure again without a live activation or reboot:
+
+```sh
+current=$(readlink -f /run/current-system)
+sudo "$current/sw/bin/nixos-rebuild" boot --no-reexec --store-path "$current"
+```
+
+This does update the system profile and boot menu; inspect the links first and retain the known-good generations. Alternatively, build/preview and successfully stage the correct host target.
 
 To restore the booted closure temporarily from the retained console:
 

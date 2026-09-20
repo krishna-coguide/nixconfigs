@@ -24,24 +24,43 @@
     inputs@{ nixpkgs, home-manager, ... }:
     let
       mkHost =
-        module:
+        name:
+        {
+          modules,
+          system ? "x86_64-linux",
+          repo ? "/etc/nixos",
+        }:
+        assert builtins.match "[a-zA-Z_][a-zA-Z0-9_-]*" name != null;
         nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs; };
-          modules = [
-            module
+          modules = modules ++ [
             home-manager.nixosModules.home-manager
+            {
+              nixpkgs.hostPlatform = system;
+              systemd.services.nixos-update.environment = {
+                NIXOS_CONFIG_REPO = repo;
+                NIXOS_UPDATE_HOST = name;
+              };
+            }
           ];
         };
+      cuda = import ./cuda.nix {
+        pkgs = import nixpkgs {
+          system = "x86_64-linux";
+          config.allowUnfreePredicate =
+            nixpkgs.legacyPackages.x86_64-linux._cuda.lib.allowUnfreeCudaPredicate;
+        };
+      };
     in
     {
-      nixosConfigurations = {
-        dev = mkHost ./configuration.nix; # EC2 integration
-        nixos = mkHost ./physical.nix; # This laptop's boot/storage/hardware
-      };
+      lib.mkHost = mkHost;
+      nixosConfigurations = nixpkgs.lib.mapAttrs mkHost (import ./hosts.nix);
+      devShells.x86_64-linux.cuda = cuda.shell;
+      packages.x86_64-linux.cuda-check = cuda.smoke;
 
       templates.agent = {
         path = ./templates/agent;
-        description = "Project toolchain + live-workspace DeepSeek Harness microVM";
+        description = "Copyable project devShell example for DeepSeek Harness with Bubblewrap";
       };
 
       formatter.x86_64-linux = nixpkgs.legacyPackages.x86_64-linux.nixfmt;
@@ -62,6 +81,7 @@
           pkgs = nixpkgs.legacyPackages.x86_64-linux;
         in
         {
+          agent-template = import ./agent-template-test.nix { inherit pkgs; };
           desktop = import ./desktop-test.nix { inherit inputs pkgs; };
           appearance = import ./appearance-test.nix {
             inherit pkgs;

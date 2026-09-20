@@ -128,4 +128,5 @@ for host in ["dev", "nixos"]:
                      "concurrent-edit", "concurrent-dry-edit", "dry-activation-failure",
                      "activation-failure", "rollback-failure", "success"]:
         run_case(scenario, host)
-run_case("invalid-host", "not-a-host")
+run_case("success", "gpu-worker_1")
+run_case("invalid-host", "bad/host")

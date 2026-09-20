@@ -2,10 +2,10 @@
 # target identity is explicit, never inferred from the login name.
 repo=${NIXOS_CONFIG_REPO:?Set NIXOS_CONFIG_REPO}
 host=${NIXOS_UPDATE_HOST:?Set NIXOS_UPDATE_HOST}
-case "$host" in
-  dev|nixos) ;;
-  *) echo "Refusing unsupported update target: $host" >&2; exit 2 ;;
-esac
+if [[ ! $host =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]]; then
+  echo "Refusing invalid update target: $host" >&2
+  exit 2
+fi
 state=${CACHE_DIRECTORY:-/var/cache/nixos-update}
 mkdir -p "$state"
 exec 9>"$state/lock"

@@ -7,9 +7,5 @@
     ./common.nix
   ];
 
-  # Keep the existing deployment path; ownership/update policy is shared.
-  systemd.services.nixos-update.environment = {
-    NIXOS_CONFIG_REPO = "/etc/nixos";
-    NIXOS_UPDATE_HOST = "dev";
-  };
+  # Deployment path/target are selected centrally in hosts.nix.
 }

@@ -1,0 +1,10 @@
+# Opt-in only: dsh web --patch ./web-network.patch.yml --no-open --port 3080
+# Upstream rejects the literal --host 0.0.0.0 flag; its server supports this config.
+# Keep the complete webserver config: patches replace, rather than merge, config.
+- id: webserver
+  config:
+    host: !!js ctx.webStartup.host ?? '0.0.0.0'
+    port: !!js ctx.webStartup.port ?? 3080
+    compression: gzip
+    compressionLevel: 1
+    compressionThresholdBytes: 1024

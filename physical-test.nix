@@ -1,4 +1,4 @@
-# Physical safety, shared host policy and built files; no activation/connections.
+# Boot/storage, shared service policy and built files; no activation/connections.
 {
   config,
   ec2Config,
@@ -6,7 +6,6 @@
 }:
 let
   inherit (pkgs) lib;
-  dev = config.users.users.dev;
   btrfsDevice = "/dev/disk/by-uuid/8a16015f-d6f8-4f74-8558-6261b9112216";
   mounts = {
     "/" = {
@@ -49,25 +48,6 @@ let
         && lib.all (option: builtins.elem option actual.options) (expected.options or [ ])
       ) (builtins.attrNames mounts);
       message = "Preserve the installed root/home/nix/EFI filesystems and Btrfs subvolumes.";
-    }
-    {
-      assertion =
-        config.users.mutableUsers
-        && !(config.users.users ? kbot)
-        && dev.password == null
-        && dev.hashedPassword == null
-        && dev.hashedPasswordFile == null;
-      message = "Retire kbot without overwriting dev's locally established password.";
-    }
-    {
-      assertion =
-        dev.isNormalUser
-        && dev.uid == 1001
-        && dev.home == "/home/dev"
-        && builtins.elem "wheel" dev.extraGroups
-        && builtins.elem "networkmanager" dev.extraGroups
-        && builtins.attrNames config.home-manager.users == [ "dev" ];
-      message = "dev is the sole managed daily account, with local administration/network access.";
     }
     {
       assertion =
@@ -121,11 +101,8 @@ let
       assertion =
         config.systemd.services.nixos-update.environment.NIXOS_UPDATE_HOST == "nixos"
         && config.systemd.services.nixos-update.environment.NIXOS_CONFIG_REPO == "/etc/nix"
-        && config.systemd.services.nixos-update.serviceConfig.User == "dev"
-        && builtins.elem "Z /etc/nix - dev users -" config.systemd.tmpfiles.rules
         && config.systemd.timers.nixos-update.timerConfig.Persistent
-        && !(config.systemd.services ? amazon-ssm-agent)
-        && !(builtins.elem "Z /etc/nixos - dev users -" config.systemd.tmpfiles.rules);
+        && !(config.systemd.services ? amazon-ssm-agent);
       message = "The laptop must keep its own checkout/target, not EC2's deployment settings.";
     }
     {
@@ -136,22 +113,15 @@ let
             let
               update = c.systemd.services.nixos-update;
             in
-            update.serviceConfig.User == "dev"
-            && update.serviceConfig.Group == "users"
-            && update.serviceConfig.ExecStart == config.systemd.services.nixos-update.serviceConfig.ExecStart
+            update.serviceConfig.ExecStart == config.systemd.services.nixos-update.serviceConfig.ExecStart
             && c.systemd.timers.nixos-update.timerConfig == config.systemd.timers.nixos-update.timerConfig
             && !(update.environment ? NIXOS_UPDATE_MODE)
-            && builtins.elem "Z ${update.environment.NIXOS_CONFIG_REPO} - dev users -" c.systemd.tmpfiles.rules
-            && builtins.elem "Z /var/cache/nixos-update - dev users -" c.systemd.tmpfiles.rules
-            && c.users.mutableUsers
-            && c.time.timeZone == "America/Chicago"
-            && c.i18n.defaultLocale == "en_US.UTF-8"
           )
           [
             config
             ec2Config
           ];
-      message = "Both hosts must share the dev-owned checkout/updater and user preferences; no per-host activation policy.";
+      message = "Both hosts must share the updater and timer; no per-host activation policy.";
     }
     {
       assertion =

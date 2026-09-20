@@ -21,8 +21,5 @@
   home-manager.users.dev.programs.ashell.settings.system_info.temperature.sensor =
     "coretemp Package id 0";
 
-  systemd.services.nixos-update.environment = {
-    NIXOS_CONFIG_REPO = "/etc/nix";
-    NIXOS_UPDATE_HOST = "nixos";
-  };
+  # Deployment path/target are selected centrally in hosts.nix.
 }

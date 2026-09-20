@@ -26,6 +26,8 @@ in
 
   environment.systemPackages = [
     pkgs.nixfmt
+    # DSH's built-in sandbox-local prefers bwrap; no setuid wrapper or service.
+    pkgs.bubblewrap
   ]
   ++ (with latest; [
     pi-coding-agent
@@ -310,6 +312,15 @@ in
         la = "eza --long --all --group-directories-first --icons=auto";
       };
       initContent = ''
+        # `su dev` can inherit root's runtime directory and user bus. Preserve a
+        # valid owned runtime; otherwise let terminal tools use their own fallback.
+        if [[ -n ''${XDG_RUNTIME_DIR:-} && ! -O "$XDG_RUNTIME_DIR" ]]; then
+          if [[ ''${DBUS_SESSION_BUS_ADDRESS:-} == "unix:path=$XDG_RUNTIME_DIR/bus"* ]]; then
+            unset DBUS_SESSION_BUS_ADDRESS
+          fi
+          unset XDG_RUNTIME_DIR
+        fi
+
         bindkey '^[[H' beginning-of-line
         bindkey '^[[F' end-of-line
         bindkey '^[[1;5C' forward-word

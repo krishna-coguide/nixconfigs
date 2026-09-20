@@ -51,9 +51,14 @@ in
       ]
       ++ lib.optionals (builtins.elem "nvidia" config.services.xserver.videoDrivers) [
         "nvidia-x11"
+        "nvidia-kernel-modules"
         "nvidia-settings"
         "nvidia-persistenced"
       ]
+    )
+    || (
+      builtins.elem "nvidia" config.services.xserver.videoDrivers
+      && pkgs._cuda.lib.allowUnfreeCudaPredicate pkg
     );
   programs.thunar = {
     enable = true;
