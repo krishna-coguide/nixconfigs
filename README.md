@@ -16,13 +16,13 @@ Flat, explicit NixOS modules with locked inputs. Required setup belongs here—n
 | `tools.nix`, `network.nix` | Development toolkit, terminal/shell, rootless Podman, VPN/proxy clients, local Tor service and network diagnostics |
 | `colors.nix`, `wallpaper.nix`, `wallpaper.svg` | Shared One Ring palette, hash-pinned wallpaper and original fallback artwork |
 | `desktop.nix`, `hyprland.lua`, `anyrun.css`, `swaync.css`, `desktop-help.py`, `desktop-actions.py` | Session/bar, launchers, described help, capture, clipboard, notifications, lock/idle and styling |
-| `apps.nix`, `element-nightly.nix` | Firefox ESR, Tor Browser, KeePassXC, Thunderbird, Steam, pinned Element Nightly, Slack, Tauon, file/media viewers and MIME defaults |
+| `apps.nix`, `element-nightly.nix` | Firefox ESR, Tor Browser, KeePassXC, Thunderbird, Steam, pinned Element Nightly, Slack, Tauon, GNOME Network Displays, file/media viewers and MIME defaults |
 | `neovim.nix`, `neovim-test.lua` | Unmodified upstream editor deployment and opt-in native runtime audit |
 | `updates.nix`, `update-system.sh`, `update-test.py` | Shared dev-owned checkouts, daily boot-staged updates and failure/concurrency regression tests |
 | `switch-system.sh`, `switch-test.py` | Same installed manual apply/preview command on both hosts, with host identity supplied by Nix |
 | `physical-test.nix`, `tools-test.nix`, `git-credentials-test.nix` | Physical/AWS safety, shared-policy assertions, offline tool/help smoke tests and disposable Git credential-cache checks |
 | `desktop-test.nix`, `desktop-test.py`, `audit-desktop.sh` | Disposable graphical/PAM/audio/scaling audit |
-| `workstation.nix`, `greeter-theme.nix`, `appearance-test.nix` | Local hardware/SDDM integration, One Ring login theme and isolated rendering/font check |
+| `workstation.nix`, `greeter-theme.nix`, `appearance-test.nix` | Local hardware/SDDM integration, Wi-Fi Display networking, One Ring login theme and isolated rendering/font check |
 | `nvidia.nix`, `cuda.nix`, `cuda-check.cu`, [NVIDIA.md](NVIDIA.md) | Opt-in proprietary NVIDIA driver, installed CUDA SDK/cuDNN, Podman CDI and GPU setup guide |
 | [DESKTOP.md](DESKTOP.md) | Live audit, wallpaper provenance, JaKooLit comparison and explicit feature-completion plan |
 | [`templates/agent/`](templates/agent/README.md), `agent-template-test.nix` | Copyable DSH devShell example, built-in Bubblewrap sandbox guide and offline example check |
@@ -165,6 +165,29 @@ review escalations, and do not run as root or start from your whole home.
 `network.nix` enables **`systemd-resolved.service` on both hosts at boot**, with automatic restart after five seconds and no retry limit. NetworkManager supplies per-link DNS on the laptop; EC2 retains dhcpcd. NixOS connects `/etc/resolv.conf` to resolved's stub and provides the D-Bus service used by `resolvectl`. Upstream DNS still comes from DHCP/VPN configuration, not hard-coded public or private servers. An explicit `systemctl stop systemd-resolved` still stops it normally.
 
 Use `systemctl status systemd-resolved` and `resolvectl status` to inspect it. `sudo resolvectl dns krishna-laptop 192.168.1.19` sets DNS on that existing interface at runtime; it does not persist across interface recreation or reboot. Put persistent VPN DNS and any routing domains in the VPN/NetworkManager profile.
+
+### Wireless displays (Miracast)
+
+`apps.nix` installs **GNOME Network Displays** from the system package pin. After
+applying the configuration, launch `gnome-network-displays` or select **GNOME
+Network Displays** in the application launcher. It uses the existing Hyprland
+screencast portal and PipeWire; GNOME Shell/GDM are not required or enabled, and
+SDDM's managed Hyprland session remains unchanged.
+
+`workstation.nix` keeps NetworkManager on **wpa_supplicant** for Wi-Fi Direct and
+opens **TCP 7236/7250 and UDP 7236/5353** in the enabled firewall. Avahi supplies
+LAN display discovery and owns the UDP 5353 rule; host/service publishing and
+Avahi NSS integration stay disabled. `systemd-resolved` still handles system DNS.
+These firewall openings apply on all workstation interfaces, so use trusted
+networks. EC2 gets the shared application, but no Avahi, NetworkManager or display
+firewall openings.
+
+Wi-Fi Direct requires compatible Wi-Fi hardware/drivers and a Miracast receiver;
+configuration checks do not verify a real wireless connection. Enable the
+receiver's screen-mirroring mode and Wi-Fi, then choose the receiver and approve
+the screen-sharing portal prompt. If needed, select the **Network-Displays**
+audio output in `pavucontrol`. For troubleshooting, check `nmcli device` for a
+`p2p-dev-*` device and run `G_MESSAGES_DEBUG=all gnome-network-displays`.
 
 ### Local Tor client
 

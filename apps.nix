@@ -107,6 +107,8 @@ in
       };
     };
   };
+  # Uses the existing PipeWire/screencast portal; no GNOME desktop is needed.
+  environment.systemPackages = [ pkgs.gnome-network-displays ];
   services.dbus.packages = [ pkgs.keepassxc ];
 
   home-manager.users.dev = {

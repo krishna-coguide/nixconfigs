@@ -53,22 +53,63 @@ let
       assertion =
         config.services.displayManager.sddm.enable
         && !config.services.desktopManager.plasma6.enable
+        && !config.services.desktopManager.gnome.enable
         && config.programs.hyprland.enable
         && config.programs.hyprland.withUWSM
         && !config.services.greetd.enable
         && !config.services.displayManager.autoLogin.enable
         && config.services.displayManager.defaultSession == "hyprland-uwsm"
         && !(builtins.elem "hyprland" config.services.displayManager.sessionData.sessionNames);
-      message = "Offer only the managed Hyprland desktop in SDDM, without Plasma or autologin.";
+      message = "Offer only the managed Hyprland desktop in SDDM, without Plasma, GNOME or autologin.";
     }
     {
       assertion =
         config.networking.networkmanager.enable
+        && config.networking.networkmanager.wifi.backend == "wpa_supplicant"
         && config.networking.networkmanager.dns == "systemd-resolved"
         && builtins.elem (lib.getName pkgs.networkmanager-openvpn) (
           map lib.getName config.networking.networkmanager.plugins
         );
-      message = "Keep NetworkManager with resolved DNS and its OpenVPN integration.";
+      message = "Keep NetworkManager with Wi-Fi Direct support, resolved DNS and its OpenVPN integration.";
+    }
+    {
+      assertion =
+        lib.all (c: builtins.elem pkgs.gnome-network-displays c.environment.systemPackages) [
+          config
+          ec2Config
+        ]
+        && config.services.pipewire.enable
+        && config.services.pipewire.pulse.enable
+        && config.xdg.portal.enable
+        && builtins.elem pkgs.xdg-desktop-portal-hyprland config.xdg.portal.extraPortals;
+      message = "Install GNOME Network Displays as a shared app and retain the workstation's PipeWire/Hyprland screencast portal.";
+    }
+    {
+      assertion =
+        config.networking.firewall.enable
+        && lib.all (port: builtins.elem port config.networking.firewall.allowedTCPPorts) [
+          7236
+          7250
+        ]
+        && lib.all (port: builtins.elem port config.networking.firewall.allowedUDPPorts) [
+          7236
+          5353
+        ]
+        && config.services.avahi.enable
+        && config.services.avahi.openFirewall
+        && !config.services.avahi.publish.enable
+        && !config.services.avahi.nssmdns4
+        && !config.services.avahi.nssmdns6;
+      message = "Workstations need the Wi-Fi Display ports and Avahi discovery, without changing host DNS or publishing services.";
+    }
+    {
+      assertion =
+        ec2Config.networking.firewall.enable
+        && ec2Config.networking.firewall.allowedTCPPorts == [ 22 ]
+        && ec2Config.networking.firewall.allowedUDPPorts == [ ]
+        && !ec2Config.services.avahi.enable
+        && !ec2Config.services.desktopManager.gnome.enable;
+      message = "Keep display discovery and its firewall openings off EC2; preserve SSH-only inbound ports.";
     }
     {
       assertion =
@@ -229,7 +270,7 @@ pkgs.runCommand "physical-config-check" { } ''
   test -f "$sessions/wayland-sessions/hyprland-uwsm.desktop"
   test ! -e "$sessions/wayland-sessions/hyprland.desktop"
   for tool in wg wg-quick openvpn iperf3 nmap traceroute whois mtr dig tcpdump ethtool nc socat \
-    fping drill torsocks proxychains4 tor nm-connection-editor resolvectl; do
+    fping drill torsocks proxychains4 tor nm-connection-editor resolvectl gnome-network-displays; do
     test -x "${config.system.path}/bin/$tool"
   done
   # Validate the exact generated torrc offline without touching live Tor state.

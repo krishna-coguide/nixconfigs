@@ -24,9 +24,27 @@ in
   networking.networkmanager = {
     enable = true;
     plugins = [ pkgs.networkmanager-openvpn ];
+    # Miracast requires NetworkManager's Wi-Fi Direct support, not iwd.
+    wifi.backend = "wpa_supplicant";
   };
   networking.dhcpcd.enable = false;
   users.users.dev.extraGroups = [ "networkmanager" ];
+
+  # Wi-Fi Display connectivity belongs on workstations, never the EC2 host.
+  networking.firewall = {
+    enable = true;
+    allowedTCPPorts = [
+      7236 # Miracast RTSP
+      7250 # Miracast over infrastructure (MICE)
+    ];
+    allowedUDPPorts = [ 7236 ];
+  };
+  # LAN display discovery uses Avahi's D-Bus API. Keep resolved as the DNS
+  # resolver; Avahi opens UDP 5353 without enabling host/service publishing.
+  services.avahi = {
+    enable = true;
+    openFirewall = true;
+  };
 
   services.xserver.enable = true;
   services.displayManager = {
