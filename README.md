@@ -174,20 +174,45 @@ Network Displays** in the application launcher. It uses the existing Hyprland
 screencast portal and PipeWire; GNOME Shell/GDM are not required or enabled, and
 SDDM's managed Hyprland session remains unchanged.
 
-`workstation.nix` keeps NetworkManager on **wpa_supplicant** for Wi-Fi Direct and
-opens **TCP 7236/7250 and UDP 7236/5353** in the enabled firewall. Avahi supplies
-LAN display discovery and owns the UDP 5353 rule; host/service publishing and
-Avahi NSS integration stay disabled. `systemd-resolved` still handles system DNS.
-These firewall openings apply on all workstation interfaces, so use trusted
-networks. EC2 gets the shared application, but no Avahi, NetworkManager or display
-firewall openings.
+`workstation.nix` keeps NetworkManager on **wpa_supplicant** for Wi-Fi Direct.
+The requested broad compatibility firewall policy applies on **all workstation
+interfaces**, including Ethernet, Wi-Fi, VPNs and dynamically created P2P links:
+
+- **TCP 7236/7250:** Miracast RTSP and infrastructure-mode signaling.
+- **TCP/UDP 53, UDP 67/68:** NetworkManager's P2P DNS and both DHCP roles.
+- **UDP 5353:** Avahi mDNS discovery.
+- **UDP 1024–65535:** permissive coverage for negotiated RTP/RTCP media ports;
+  this is a compatibility policy, not a range required by the Miracast standard.
+- **Loose reverse-path filtering:** tolerate asymmetric Wi-Fi/VPN routing while
+  retaining the firewall. Unrelated TCP ports remain blocked.
+
+**Security tradeoff:** any other application listening on these ports is also
+reachable from connected networks; the rules are not limited to the display
+application or a trusted LAN. No entire interface is trusted, and no global DNS
+or DHCP server is started. Avahi supplies LAN display discovery without host/service
+publishing or NSS integration; `systemd-resolved` still handles system DNS. EC2
+gets the shared application, but no Avahi, NetworkManager or display openings.
 
 Wi-Fi Direct requires compatible Wi-Fi hardware/drivers and a Miracast receiver;
 configuration checks do not verify a real wireless connection. Enable the
-receiver's screen-mirroring mode and Wi-Fi, then choose the receiver and approve
-the screen-sharing portal prompt. If needed, select the **Network-Displays**
-audio output in `pavucontrol`. For troubleshooting, check `nmcli device` for a
-`p2p-dev-*` device and run `G_MESSAGES_DEBUG=all gnome-network-displays`.
+receiver's screen-mirroring mode (LG: **Screen Share**) and Wi-Fi. GNOME Network
+Displays can open Hyprland's **screen-sharing picker at startup**: select the
+monitor/window to share rather than dismissing the prompt, then choose the TV
+and approve its connection prompt. No capture permission is granted automatically.
+If needed, select the **Network-Displays** audio output in `pavucontrol`.
+
+For troubleshooting, check `nmcli device` for a `p2p-dev-*` device. Close the app
+before running `G_MESSAGES_DEBUG=all gnome-network-displays`, otherwise the command
+may only activate the existing non-debug instance. A `P2P-DEVICE-FOUND` entry in
+`journalctl -u wpa_supplicant` confirms radio discovery, not successful streaming;
+`Screencast SelectSources() canceled` indicates a dismissed screen-sharing prompt,
+not a firewall failure. Wi-Fi Direct discovery happens before IP firewall rules.
+These rules cannot add missing receiver protocols, fix incompatible drivers/codecs,
+or carry link-local mDNS discovery across arbitrary routers/VPNs.
+
+Upstream references: [GNOME troubleshooting](https://gitlab.gnome.org/GNOME/gnome-network-displays/-/blob/master/README.md),
+[its P2P firewall zone](https://gitlab.gnome.org/GNOME/gnome-network-displays/-/blob/master/src/nd-firewalld.c),
+and [GStreamer's negotiated RTP/RTCP sockets](https://gstreamer.freedesktop.org/documentation/gst-rtsp-server/rtsp-stream.html).
 
 ### Local Tor client
 

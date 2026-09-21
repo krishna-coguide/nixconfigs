@@ -30,14 +30,30 @@ in
   networking.dhcpcd.enable = false;
   users.users.dev.extraGroups = [ "networkmanager" ];
 
-  # Wi-Fi Display connectivity belongs on workstations, never the EC2 host.
+  # Broad Miracast compatibility on every workstation interface (LAN and
+  # dynamically named Wi-Fi Direct links), never on the headless EC2 host.
+  # This intentionally exposes other listeners on these ports too.
   networking.firewall = {
     enable = true;
+    checkReversePath = "loose"; # Permit asymmetric Wi-Fi/VPN return routes.
     allowedTCPPorts = [
+      53 # NetworkManager's DNS server when providing the P2P network
       7236 # Miracast RTSP
       7250 # Miracast over infrastructure (MICE)
     ];
-    allowedUDPPorts = [ 7236 ];
+    allowedUDPPorts = [
+      53 # P2P DNS
+      67 # P2P DHCP server
+      68 # P2P DHCP client, including broadcast replies
+    ];
+    # RTP/RTCP uses negotiated ports, not a fixed UDP 7236 listener. This is
+    # an explicitly broad compatibility policy, not a protocol-required range.
+    allowedUDPPortRanges = [
+      {
+        from = 1024;
+        to = 65535;
+      }
+    ];
   };
   # LAN display discovery uses Avahi's D-Bus API. Keep resolved as the DNS
   # resolver; Avahi opens UDP 5353 without enabling host/service publishing.

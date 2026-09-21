@@ -87,26 +87,39 @@ let
     {
       assertion =
         config.networking.firewall.enable
+        && config.networking.firewall.checkReversePath == "loose"
         && lib.all (port: builtins.elem port config.networking.firewall.allowedTCPPorts) [
+          53
           7236
           7250
         ]
         && lib.all (port: builtins.elem port config.networking.firewall.allowedUDPPorts) [
-          7236
+          53
+          67
+          68
           5353
         ]
+        && builtins.elem {
+          from = 1024;
+          to = 65535;
+        } config.networking.firewall.allowedUDPPortRanges
+        && config.networking.firewall.allowedTCPPortRanges == [ ]
+        && config.networking.firewall.trustedInterfaces == [ "lo" ]
         && config.services.avahi.enable
         && config.services.avahi.openFirewall
         && !config.services.avahi.publish.enable
         && !config.services.avahi.nssmdns4
         && !config.services.avahi.nssmdns6;
-      message = "Workstations need the Wi-Fi Display ports and Avahi discovery, without changing host DNS or publishing services.";
+      message = "Workstations need all-interface Miracast control, DHCP/DNS, negotiated UDP media and Avahi discovery, without trusting entire interfaces or changing host DNS.";
     }
     {
       assertion =
         ec2Config.networking.firewall.enable
         && ec2Config.networking.firewall.allowedTCPPorts == [ 22 ]
         && ec2Config.networking.firewall.allowedUDPPorts == [ ]
+        && ec2Config.networking.firewall.allowedTCPPortRanges == [ ]
+        && ec2Config.networking.firewall.allowedUDPPortRanges == [ ]
+        && ec2Config.networking.firewall.trustedInterfaces == [ "lo" ]
         && !ec2Config.services.avahi.enable
         && !ec2Config.services.desktopManager.gnome.enable;
       message = "Keep display discovery and its firewall openings off EC2; preserve SSH-only inbound ports.";
