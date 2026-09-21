@@ -178,8 +178,12 @@ SDDM's managed Hyprland session remains unchanged.
 It also applies `networkmanager-p2p-peer-refresh.patch`: while discovery runs,
 NetworkManager refreshes wpa_supplicant's P2P peer property after 1, 2, 4 and 8
 seconds. This works around receivers being visible in wpa_supplicant while
-NetworkManager—and therefore GNOME Network Displays—reports no peers. Remove the
-patch once upstream handles this signal-path failure natively.
+NetworkManager—and therefore GNOME Network Displays—reports no peers. The patch
+also pins P2P negotiation to the broadly supported 2.4 GHz channel 11: the tested
+LG/webOS receiver answers there but drops NetworkManager's automatically selected
+5 GHz negotiation before confirmation. A final udev rule prevents NixOS's generic
+wlan-hotplug rule from restarting wpa_supplicant when the P2P group interface is
+created. Remove these workarounds once upstream handles both paths natively.
 
 The requested broad compatibility firewall policy applies on **all workstation
 interfaces**, including Ethernet, Wi-Fi, VPNs and dynamically created P2P links:

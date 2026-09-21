@@ -12,11 +12,21 @@ let
   # Work around missed wpa_supplicant peer signals by refreshing the P2P peer
   # property during discovery. Remove once NetworkManager handles this natively.
   networkManager = pkgs.networkmanager.overrideAttrs (old: {
-    patches = (old.patches or [ ]) ++ [ ./networkmanager-p2p-peer-refresh.patch ];
+    patches = (old.patches or [ ]) ++ [
+      ./networkmanager-p2p-peer-refresh.patch
+      ./networkmanager-p2p-channel-11.patch
+    ];
     passthru = (old.passthru or { }) // {
       miracastPeerRefresh = true;
+      miracastChannel11 = true;
     };
   });
+  # NixOS normally restarts wpa_supplicant for every wlan interface hotplug.
+  # A P2P group is itself a wlan interface, so that rule tears down Miracast
+  # immediately after negotiation. This later udev rule replaces its RUN list.
+  miracastP2PUdevRules = pkgs.writeTextDir "lib/udev/rules.d/99-z-miracast-p2p.rules" ''
+    ACTION=="add|remove", SUBSYSTEM=="net", KERNEL=="p2p-*", RUN="${pkgs.coreutils}/bin/true"
+  '';
   managedHyprlandSession =
     pkgs.runCommand "hyprland-managed-session"
       {
@@ -38,6 +48,7 @@ in
   };
   networking.dhcpcd.enable = false;
   users.users.dev.extraGroups = [ "networkmanager" ];
+  services.udev.packages = [ miracastP2PUdevRules ];
 
   # Broad Miracast compatibility on every workstation interface (LAN and
   # dynamically named Wi-Fi Direct links), never on the headless EC2 host.

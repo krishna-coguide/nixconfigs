@@ -1,0 +1,8 @@
+--- a/src/core/supplicant/nm-supplicant-interface.c
++++ b/src/core/supplicant/nm-supplicant-interface.c
+@@ -3014,0 +3015,5 @@
++    /* This LG/webOS receiver answers discovery on channel 11 but drops the
++     * automatically selected 5 GHz GO negotiation before confirmation.
++     * Pin the broadly supported social channel so negotiation and WPS finish
++     * reliably instead of timing out after 45 seconds. */
++    g_variant_builder_add(&builder, "{sv}", "frequency", g_variant_new_int32(2462));

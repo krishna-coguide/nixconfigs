@@ -66,12 +66,13 @@ let
       assertion =
         config.networking.networkmanager.enable
         && (config.networking.networkmanager.package.passthru.miracastPeerRefresh or false)
+        && (config.networking.networkmanager.package.passthru.miracastChannel11 or false)
         && config.networking.networkmanager.wifi.backend == "wpa_supplicant"
         && config.networking.networkmanager.dns == "systemd-resolved"
         && builtins.elem (lib.getName pkgs.networkmanager-openvpn) (
           map lib.getName config.networking.networkmanager.plugins
         );
-      message = "Keep NetworkManager with reliable Wi-Fi Direct peer refresh, resolved DNS and its OpenVPN integration.";
+      message = "Keep NetworkManager with reliable Wi-Fi Direct peer refresh/channel negotiation, resolved DNS and its OpenVPN integration.";
     }
     {
       assertion =
