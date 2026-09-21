@@ -9,6 +9,14 @@
 let
   font = builtins.head config.fonts.fontconfig.defaultFonts.monospace;
   greeterTheme = import ./greeter-theme.nix { inherit pkgs font; };
+  # Work around missed wpa_supplicant peer signals by refreshing the P2P peer
+  # property during discovery. Remove once NetworkManager handles this natively.
+  networkManager = pkgs.networkmanager.overrideAttrs (old: {
+    patches = (old.patches or [ ]) ++ [ ./networkmanager-p2p-peer-refresh.patch ];
+    passthru = (old.passthru or { }) // {
+      miracastPeerRefresh = true;
+    };
+  });
   managedHyprlandSession =
     pkgs.runCommand "hyprland-managed-session"
       {
@@ -23,6 +31,7 @@ in
 {
   networking.networkmanager = {
     enable = true;
+    package = networkManager;
     plugins = [ pkgs.networkmanager-openvpn ];
     # Miracast requires NetworkManager's Wi-Fi Direct support, not iwd.
     wifi.backend = "wpa_supplicant";

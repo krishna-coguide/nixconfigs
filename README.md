@@ -175,6 +175,12 @@ screencast portal and PipeWire; GNOME Shell/GDM are not required or enabled, and
 SDDM's managed Hyprland session remains unchanged.
 
 `workstation.nix` keeps NetworkManager on **wpa_supplicant** for Wi-Fi Direct.
+It also applies `networkmanager-p2p-peer-refresh.patch`: while discovery runs,
+NetworkManager refreshes wpa_supplicant's P2P peer property after 1, 2, 4 and 8
+seconds. This works around receivers being visible in wpa_supplicant while
+NetworkManager—and therefore GNOME Network Displays—reports no peers. Remove the
+patch once upstream handles this signal-path failure natively.
+
 The requested broad compatibility firewall policy applies on **all workstation
 interfaces**, including Ethernet, Wi-Fi, VPNs and dynamically created P2P links:
 

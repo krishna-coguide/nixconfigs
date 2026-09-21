@@ -1,0 +1,53 @@
+--- a/src/core/supplicant/nm-supplicant-interface.c
++++ b/src/core/supplicant/nm-supplicant-interface.c
+@@ -2922,6 +2922,32 @@
+ 
+ /*****************************************************************************/
+ 
++static void _get_all_p2p_device_cb(GVariant *result, GError *error, gpointer user_data);
++
++static void
++_p2p_refresh_peers_cb(GVariant *result, GError *error, gpointer user_data)
++{
++    _get_all_p2p_device_cb(result, error, user_data);
++    g_object_unref(user_data);
++}
++
++static gboolean
++_p2p_refresh_peers(gpointer user_data)
++{
++    NMSupplicantInterface        *self = NM_SUPPLICANT_INTERFACE(user_data);
++    NMSupplicantInterfacePrivate *priv = NM_SUPPLICANT_INTERFACE_GET_PRIVATE(self);
++
++    nm_dbus_connection_call_get_all(priv->dbus_connection,
++                                    priv->name_owner->str,
++                                    priv->object_path->str,
++                                    NM_WPAS_DBUS_IFACE_INTERFACE_P2P_DEVICE,
++                                    5000,
++                                    priv->main_cancellable,
++                                    _p2p_refresh_peers_cb,
++                                    g_object_ref(self));
++    return G_SOURCE_REMOVE;
++}
++
+ void
+ nm_supplicant_interface_p2p_start_find(NMSupplicantInterface *self, guint timeout)
+ {
+@@ -2939,6 +2965,17 @@
+                                  g_variant_new("(a{sv})", &builder),
+                                  G_VARIANT_TYPE("()"),
+                                  "p2p-find");
++
++    /* Some wpa_supplicant/dbus-broker combinations expose peers through the
++     * Peers property but NetworkManager misses their DeviceFound signals.
++     * Refresh the property while discovery is active so clients still receive
++     * PeerAdded and updated Peers notifications. */
++    for (guint delay = 1; delay <= 8; delay *= 2)
++        g_timeout_add_seconds_full(G_PRIORITY_DEFAULT,
++                                   delay,
++                                   _p2p_refresh_peers,
++                                   g_object_ref(self),
++                                   g_object_unref);
+ }
+ 
+ void
