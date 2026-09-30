@@ -67,6 +67,12 @@
       packages.x86_64-linux.element-nightly = import ./element-nightly.nix {
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
       };
+      packages.x86_64-linux.tastytrade = import ./tastytrade.nix {
+        pkgs = import nixpkgs {
+          system = "x86_64-linux";
+          config.allowUnfreePredicate = pkg: nixpkgs.lib.getName pkg == "tastytrade";
+        };
+      };
 
       nixosModules = {
         desktop = ./desktop.nix;

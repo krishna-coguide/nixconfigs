@@ -14,6 +14,7 @@ let
     config = pkgs.config;
   };
   elementNightly = import ./element-nightly.nix { inherit pkgs; };
+  tastytrade = import ./tastytrade.nix { inherit pkgs; };
   browserAddon = pkgs.fetchurl {
     name = "keepassxc-browser-1.10.3.xpi";
     url = "https://addons.mozilla.org/firefox/downloads/file/4831838/keepassxc_browser-1.10.3.xpi";
@@ -48,6 +49,7 @@ in
         "steam-run"
         "steam-original"
         "slack"
+        "tastytrade"
       ]
       ++ lib.optionals (builtins.elem "nvidia" config.services.xserver.videoDrivers) [
         "nvidia-x11"
@@ -124,6 +126,7 @@ in
       # KeePassXC Secret Service explicitly; never fall back to basic_text.
       elementNightly
       slack
+      tastytrade
     ];
     # Fix the pinned package's stale launcher command, preserving its metadata.
     xdg.dataFile."applications/tauonmb.desktop".source = pkgs.runCommand "tauonmb.desktop" { } ''
@@ -191,6 +194,7 @@ in
         "x-scheme-handler/matrix" = [ "element-desktop-nightly.desktop" ];
         "x-scheme-handler/element" = [ "element-desktop-nightly.desktop" ];
         "x-scheme-handler/io.element.desktop" = [ "element-desktop-nightly.desktop" ];
+        "x-scheme-handler/tastytrade-desktop" = [ "tastytrade.desktop" ];
       };
     };
   };
