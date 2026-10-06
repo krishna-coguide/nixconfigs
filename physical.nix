@@ -6,6 +6,7 @@
     ./hardware-configuration.nix
     ./common.nix
     ./workstation.nix
+    ./windows-vm.nix
   ];
 
   boot.loader = {

@@ -277,6 +277,19 @@ let
         && config.services.openvpn.servers == { };
       message = "Installing VPN tools must not invent tunnels, peers or credentials.";
     }
+    {
+      assertion =
+        config.virtualisation.libvirtd.enable
+        && config.virtualisation.libvirtd.qemu.swtpm.enable
+        && !config.virtualisation.libvirtd.qemu.runAsRoot
+        && config.virtualisation.libvirtd.onBoot == "ignore"
+        && config.programs.virt-manager.enable
+        && builtins.elem "libvirtd" config.users.users.dev.extraGroups
+        && builtins.hasAttr "libvirt-define-windows" config.systemd.services
+        && !ec2Config.virtualisation.libvirtd.enable
+        && !(builtins.hasAttr "libvirt-define-windows" ec2Config.systemd.services);
+      message = "Only the laptop runs the unprivileged, never-autostarted Windows 11 guest with an emulated TPM.";
+    }
   ];
 in
 assert lib.all (test: lib.assertMsg test.assertion test.message) tests;
@@ -294,5 +307,13 @@ pkgs.runCommand "physical-config-check" { } ''
   ${config.services.tor.package}/bin/tor --verify-config \
     -f ${builtins.head config.systemd.services.tor.restartTriggers} \
     --DataDirectory "$TMPDIR/tor"
+  # The Windows guest must stay a valid libvirt domain with Secure Boot, a
+  # TPM, the webcam and SPICE microphone/speaker audio.
+  domain=${builtins.head config.systemd.services.libvirt-define-windows.restartTriggers}
+  ${config.virtualisation.libvirtd.package}/bin/virt-xml-validate "$domain" domain
+  grep -q 'name="secure-boot"' "$domain"
+  grep -q '<tpm model="tpm-crb">' "$domain"
+  grep -q '<vendor id="0x5986"/>' "$domain"
+  grep -q '<audio id="1" type="spice"/>' "$domain"
   touch "$out"
 ''
