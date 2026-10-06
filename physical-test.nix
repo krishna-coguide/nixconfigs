@@ -286,6 +286,7 @@ let
         && config.programs.virt-manager.enable
         && builtins.elem "libvirtd" config.users.users.dev.extraGroups
         && builtins.hasAttr "libvirt-define-windows" config.systemd.services
+        && builtins.elem "d /var/lib/swtpm-localca 0750 qemu-libvirtd qemu-libvirtd -" config.systemd.tmpfiles.rules
         && !ec2Config.virtualisation.libvirtd.enable
         && !(builtins.hasAttr "libvirt-define-windows" ec2Config.systemd.services);
       message = "Only the laptop runs the unprivileged, never-autostarted Windows 11 guest with an emulated TPM.";

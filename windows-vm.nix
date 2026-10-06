@@ -183,6 +183,10 @@ in
     # Btrfs copy-on-write fragments VM images badly; new files inherit +C.
     "h ${images} - - - - +C"
     "L+ ${driversIso} - - - - ${pkgs.virtio-win.src}"
+    # swtpm_setup signs each vTPM's EK cert with a local CA kept here. It runs
+    # as swtpm_user (qemu-libvirtd), which cannot create dirs in /var/lib, and
+    # the NixOS libvirtd module does not create it.
+    "d /var/lib/swtpm-localca 0750 qemu-libvirtd qemu-libvirtd -"
   ];
 
   systemd.services."libvirt-define-${name}" = {
