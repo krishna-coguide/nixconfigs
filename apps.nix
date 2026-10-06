@@ -50,6 +50,7 @@ in
         "steam-original"
         "slack"
         "tastytrade"
+        "google-chrome"
       ]
       ++ lib.optionals (builtins.elem "nvidia" config.services.xserver.videoDrivers) [
         "nvidia-x11"
@@ -127,6 +128,8 @@ in
       elementNightly
       slack
       tastytrade
+      # Same keyring rule for Chrome: KeePassXC Secret Service, not basic.
+      (google-chrome.override { commandLineArgs = "--password-store=gnome-libsecret"; })
     ];
     # Fix the pinned package's stale launcher command, preserving its metadata.
     xdg.dataFile."applications/tauonmb.desktop".source = pkgs.runCommand "tauonmb.desktop" { } ''
