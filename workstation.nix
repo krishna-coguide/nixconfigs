@@ -9,16 +9,20 @@
 let
   font = builtins.head config.fonts.fontconfig.defaultFonts.monospace;
   greeterTheme = import ./greeter-theme.nix { inherit pkgs font; };
-  # Work around missed wpa_supplicant peer signals by refreshing the P2P peer
-  # property during discovery. Remove once NetworkManager handles this natively.
+  # Work around missed wpa_supplicant P2P signals: refresh the peer property
+  # during discovery, and poll for the group interface after Connect because
+  # GroupStarted is never processed either. Remove once NetworkManager handles
+  # these natively.
   networkManager = pkgs.networkmanager.overrideAttrs (old: {
     patches = (old.patches or [ ]) ++ [
       ./networkmanager-p2p-peer-refresh.patch
       ./networkmanager-p2p-channel-11.patch
+      ./networkmanager-p2p-group-poll.patch
     ];
     passthru = (old.passthru or { }) // {
       miracastPeerRefresh = true;
       miracastChannel11 = true;
+      miracastGroupPoll = true;
     };
   });
   # NixOS normally restarts wpa_supplicant for every wlan interface hotplug.

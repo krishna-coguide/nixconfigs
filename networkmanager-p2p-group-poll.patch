@@ -1,0 +1,268 @@
+diff --git a/src/core/supplicant/nm-supplicant-interface.c b/src/core/supplicant/nm-supplicant-interface.c
+index b660b27..af20680 100644
+--- a/src/core/supplicant/nm-supplicant-interface.c
++++ b/src/core/supplicant/nm-supplicant-interface.c
+@@ -101,6 +101,12 @@ typedef struct _NMSupplicantInterfacePrivate {
+ 
+     GCancellable *p2p_group_properties_cancellable;
+ 
++    /* Local workaround state: poll for a missed GroupStarted signal. */
++    char **p2p_group_poll_known;
++    guint  p2p_group_poll_id;
++    guint  p2p_group_poll_count;
++    bool   p2p_group_poll_have_known;
++
+     WpsData *wps_data;
+ 
+     AssocData *assoc_data;
+@@ -2993,6 +2999,186 @@ nm_supplicant_interface_p2p_stop_find(NMSupplicantInterface *self)
+ 
+ /*****************************************************************************/
+ 
++/* Local workaround: on this system NetworkManager never processes
++ * wpa_supplicant's P2PDevice.GroupStarted signal even though it is emitted on
++ * the management interface path and deliverable to other root clients.
++ * Activation then stalls until the 45 s supplicant timeout and the group is
++ * left running. After a P2P Connect, poll wpa_supplicant for a new group
++ * interface and feed a synthesized GroupStarted into the normal handler. */
++
++#define P2P_GROUP_POLL_MAX_TICKS 45
++
++typedef struct {
++    NMSupplicantInterface *self;
++    char                  *iface_path;
++} P2PGroupPollIfaceData;
++
++static void _signal_handle(NMSupplicantInterface *self,
++                           const char            *signal_interface_name,
++                           const char            *signal_name,
++                           GVariant              *parameters);
++
++static void
++_p2p_group_poll_stop(NMSupplicantInterface *self)
++{
++    NMSupplicantInterfacePrivate *priv = NM_SUPPLICANT_INTERFACE_GET_PRIVATE(self);
++
++    nm_clear_g_source(&priv->p2p_group_poll_id);
++    nm_clear_pointer(&priv->p2p_group_poll_known, g_strfreev);
++    priv->p2p_group_poll_have_known = FALSE;
++}
++
++static void
++_p2p_group_poll_iface_cb(GVariant *result, GError *error, gpointer user_data)
++{
++    P2PGroupPollIfaceData        *data       = user_data;
++    NMSupplicantInterface        *self       = data->self;
++    NMSupplicantInterfacePrivate *priv       = NM_SUPPLICANT_INTERFACE_GET_PRIVATE(self);
++    gs_unref_variant GVariant    *props      = NULL;
++    const char                   *group_path = NULL;
++    const char                   *role       = NULL;
++
++    if (nm_utils_error_is_cancelled(error) || !result || !priv->p2p_group_poll_id)
++        goto out;
++
++    g_variant_get(result, "(@a{sv})", &props);
++    if (!g_variant_lookup(props, "Group", "&o", &group_path) || nm_streq(group_path, "/"))
++        goto out;
++    if (!g_variant_lookup(props, "Role", "&s", &role))
++        role = "";
++
++    _LOGI("P2P: GroupStarted signal not seen; detected group %s on %s by polling (role %s)",
++          group_path,
++          data->iface_path,
++          role);
++
++    if (!priv->is_ready_p2p_device) {
++        _LOGW("P2P: P2P device was not marked ready; forcing it for GroupStarted");
++        priv->is_ready_p2p_device = TRUE;
++    }
++
++    {
++        GVariantBuilder            builder;
++        gs_unref_variant GVariant *params = NULL;
++
++        g_variant_builder_init(&builder, G_VARIANT_TYPE_VARDICT);
++        g_variant_builder_add(&builder,
++                              "{sv}",
++                              "interface_object",
++                              g_variant_new_object_path(data->iface_path));
++        g_variant_builder_add(&builder,
++                              "{sv}",
++                              "group_object",
++                              g_variant_new_object_path(group_path));
++        g_variant_builder_add(&builder, "{sv}", "role", g_variant_new_string(role));
++        params = g_variant_ref_sink(g_variant_new("(a{sv})", &builder));
++
++        /* _signal_handle() stops the poll while handling GroupStarted. */
++        _signal_handle(self, NM_WPAS_DBUS_IFACE_INTERFACE_P2P_DEVICE, "GroupStarted", params);
++    }
++
++out:
++    g_object_unref(self);
++    g_free(data->iface_path);
++    g_free(data);
++}
++
++static void
++_p2p_group_poll_root_cb(GVariant *result, GError *error, gpointer user_data)
++{
++    NMSupplicantInterface        *self   = user_data;
++    NMSupplicantInterfacePrivate *priv   = NM_SUPPLICANT_INTERFACE_GET_PRIVATE(self);
++    gs_unref_variant GVariant    *props  = NULL;
++    gs_unref_variant GVariant    *v      = NULL;
++    gs_strfreev char            **ifaces = NULL;
++    guint                         i;
++
++    if (nm_utils_error_is_cancelled(error) || !result || !priv->p2p_group_poll_id)
++        goto out;
++
++    g_variant_get(result, "(@a{sv})", &props);
++    v = g_variant_lookup_value(props, "Interfaces", G_VARIANT_TYPE_OBJECT_PATH_ARRAY);
++    if (!v)
++        goto out;
++    ifaces = g_variant_dup_objv(v, NULL);
++
++    if (!priv->p2p_group_poll_have_known) {
++        /* First reply: remember pre-existing interfaces (e.g. stale groups). */
++        priv->p2p_group_poll_known      = g_steal_pointer(&ifaces);
++        priv->p2p_group_poll_have_known = TRUE;
++        goto out;
++    }
++
++    for (i = 0; ifaces[i]; i++) {
++        P2PGroupPollIfaceData *data;
++
++        if (nm_streq(ifaces[i], priv->object_path->str))
++            continue;
++        if (priv->p2p_group_poll_known
++            && g_strv_contains((const char *const *) priv->p2p_group_poll_known, ifaces[i]))
++            continue;
++
++        data             = g_new0(P2PGroupPollIfaceData, 1);
++        data->self       = g_object_ref(self);
++        data->iface_path = g_strdup(ifaces[i]);
++        nm_dbus_connection_call_get_all(priv->dbus_connection,
++                                        priv->name_owner->str,
++                                        ifaces[i],
++                                        NM_WPAS_DBUS_IFACE_INTERFACE_P2P_DEVICE,
++                                        5000,
++                                        priv->main_cancellable,
++                                        _p2p_group_poll_iface_cb,
++                                        data);
++    }
++
++out:
++    g_object_unref(self);
++}
++
++static void
++_p2p_group_poll_request(NMSupplicantInterface *self)
++{
++    NMSupplicantInterfacePrivate *priv = NM_SUPPLICANT_INTERFACE_GET_PRIVATE(self);
++
++    nm_dbus_connection_call_get_all(priv->dbus_connection,
++                                    priv->name_owner->str,
++                                    NM_WPAS_DBUS_PATH,
++                                    NM_WPAS_DBUS_INTERFACE,
++                                    5000,
++                                    priv->main_cancellable,
++                                    _p2p_group_poll_root_cb,
++                                    g_object_ref(self));
++}
++
++static gboolean
++_p2p_group_poll_tick(gpointer user_data)
++{
++    NMSupplicantInterface        *self = user_data;
++    NMSupplicantInterfacePrivate *priv = NM_SUPPLICANT_INTERFACE_GET_PRIVATE(self);
++
++    if (++priv->p2p_group_poll_count > P2P_GROUP_POLL_MAX_TICKS) {
++        priv->p2p_group_poll_id = 0;
++        _p2p_group_poll_stop(self);
++        return G_SOURCE_REMOVE;
++    }
++
++    _p2p_group_poll_request(self);
++    return G_SOURCE_CONTINUE;
++}
++
++static void
++_p2p_group_poll_start(NMSupplicantInterface *self)
++{
++    NMSupplicantInterfacePrivate *priv = NM_SUPPLICANT_INTERFACE_GET_PRIVATE(self);
++
++    _p2p_group_poll_stop(self);
++    priv->p2p_group_poll_count = 0;
++    /* The timeout holds no reference; dispose() stops it. */
++    priv->p2p_group_poll_id = g_timeout_add(1000, _p2p_group_poll_tick, self);
++    /* Snapshot the interfaces that exist before the group is created. */
++    _p2p_group_poll_request(self);
++}
++
+ void
+ nm_supplicant_interface_p2p_connect(NMSupplicantInterface *self,
+                                     const char            *peer,
+@@ -3024,6 +3210,8 @@ nm_supplicant_interface_p2p_connect(NMSupplicantInterface *self,
+                                  g_variant_new("(a{sv})", &builder),
+                                  G_VARIANT_TYPE("(s)"),
+                                  "p2p-connect");
++
++    _p2p_group_poll_start(self);
+ }
+ 
+ void
+@@ -3031,6 +3219,8 @@ nm_supplicant_interface_p2p_cancel_connect(NMSupplicantInterface *self)
+ {
+     g_return_if_fail(NM_IS_SUPPLICANT_INTERFACE(self));
+ 
++    _p2p_group_poll_stop(self);
++
+     _dbus_connection_call_simple_full(self,
+                                       NM_WPAS_DBUS_IFACE_INTERFACE_P2P_DEVICE,
+                                       "Cancel",
+@@ -3045,6 +3235,8 @@ nm_supplicant_interface_p2p_disconnect(NMSupplicantInterface *self)
+ {
+     g_return_if_fail(NM_IS_SUPPLICANT_INTERFACE(self));
+ 
++    _p2p_group_poll_stop(self);
++
+     _dbus_connection_call_simple(self,
+                                  NM_WPAS_DBUS_IFACE_INTERFACE_P2P_DEVICE,
+                                  "Disconnect",
+@@ -3289,8 +3481,10 @@ _signal_handle(NMSupplicantInterface *self,
+     }
+ 
+     if (nm_streq(signal_interface_name, NM_WPAS_DBUS_IFACE_INTERFACE_P2P_DEVICE)) {
+-        if (!priv->is_ready_p2p_device)
++        if (!priv->is_ready_p2p_device) {
++            _LOGT("P2P: dropping %s signal: P2P device not ready", signal_name);
+             return;
++        }
+ 
+         if (nm_streq(signal_name, "DeviceFound")) {
+             if (g_variant_is_of_type(parameters, G_VARIANT_TYPE("(o)"))) {
+@@ -3312,6 +3506,7 @@ _signal_handle(NMSupplicantInterface *self,
+         }
+ 
+         if (nm_streq(signal_name, "GroupStarted")) {
++            _p2p_group_poll_stop(self);
+             if (g_variant_is_of_type(parameters, G_VARIANT_TYPE("(a{sv})"))) {
+                 gs_unref_variant GVariant             *args  = NULL;
+                 gs_unref_object NMSupplicantInterface *iface = NULL;
+@@ -3414,6 +3609,7 @@ _signal_cb(GDBusConnection *connection,
+     NMSupplicantInterfacePrivate *priv = NM_SUPPLICANT_INTERFACE_GET_PRIVATE(self);
+ 
+     priv->starting_pending_count++;
++    _LOGT("signal: %s.%s on %s", signal_interface_name, signal_name, object_path);
+     _signal_handle(self, signal_interface_name, signal_name, parameters);
+     priv->starting_pending_count--;
+     _starting_check_ready(self);
+@@ -3748,6 +3944,8 @@ dispose(GObject *object)
+ 
+     nm_assert(!priv->assoc_data);
+ 
++    _p2p_group_poll_stop(self);
++
+     nm_clear_pointer(&priv->bss_idx, g_hash_table_destroy);
+     nm_clear_pointer(&priv->peer_idx, g_hash_table_destroy);
+ 
