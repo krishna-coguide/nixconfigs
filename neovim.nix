@@ -1,4 +1,4 @@
-{ inputs, ... }:
+{ pkgs, ... }:
 
 {
   programs.neovim = {
@@ -10,42 +10,25 @@
   home-manager.users.dev =
     { config, lib, ... }:
     let
-      dots = inputs.neovim-dots;
+      url = "https://github.com/krishna-coguide/nvim-dots";
       configDir = "${config.xdg.configHome}/nvim";
-      lockFile = "${config.xdg.stateHome}/nvim/locks/${dots.rev}.json";
-      backup = "${config.home.homeDirectory}/projects/neovim-dots-before-nix";
+      git = lib.getExe pkgs.git;
     in
     {
-      # Import the original repo, without translating or patching its Lua.
-      xdg.configFile."nvim" = {
-        source = lib.cleanSourceWith {
-          src = dots;
-          filter = path: _: baseNameOf path != "lazy-lock.json";
-        };
-        recursive = true;
-      };
-
-      # Lazy writes this file. Seed a writable copy per pinned config revision.
-      xdg.configFile."nvim/lazy-lock.json".source = config.lib.file.mkOutOfStoreSymlink lockFile;
-      home.activation.neovimLock = lib.hm.dag.entryBetween [ "linkGeneration" ] [ "writeBoundary" ] ''
-        if [[ ! -e "${lockFile}" ]]; then
-          run install -D -m 0600 "${dots}/lazy-lock.json" "${lockFile}"
+      # ~/.config/nvim is a real, dev-owned Git checkout of the dotfiles: edit,
+      # commit and push there. Lazy updates its tracked lazy-lock.json in place.
+      # Clone only when absent (after old store links are removed); never fetch,
+      # reset or overwrite an existing checkout or unrelated files.
+      home.activation.neovimCheckout = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+        if [[ ! -e "${configDir}" && ! -L "${configDir}" ]] ||
+          [[ -d "${configDir}" && ! -L "${configDir}" && -z "$(ls -A "${configDir}")" ]]; then
+          # Activation also runs at boot, possibly offline: warn, do not fail.
+          if ! run env GIT_TERMINAL_PROMPT=0 ${git} clone --quiet ${url} "${configDir}"; then
+            echo "Could not clone ${url}; retry with: git clone ${url} ${configDir}" >&2
+          fi
+        elif [[ ! -e "${configDir}/.git" ]]; then
+          echo "Leaving ${configDir} untouched: it is not a Git checkout of ${url}." >&2
         fi
       '';
-
-      # Preserve the earlier manual checkout intact; never overwrite a backup.
-      # On a clean machine this is a no-op, not a deployment prerequisite.
-      home.activation.neovimCheckoutBackup =
-        lib.hm.dag.entryBetween [ "linkGeneration" ] [ "writeBoundary" ]
-          ''
-            if [[ -d "${configDir}/.git" ]]; then
-              if [[ -e "${backup}" || -L "${backup}" ]]; then
-                echo "Refusing to overwrite Neovim checkout backup: ${backup}" >&2
-                exit 1
-              fi
-              run mkdir -p "$(dirname "${backup}")"
-              run mv -T "${configDir}" "${backup}"
-            fi
-          '';
     };
 }

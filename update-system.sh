@@ -30,7 +30,7 @@ trap cleanup EXIT
 
 git worktree add --detach "$work" "$baseline"
 cd "$work"
-# Advance package inputs to newest resolving branch heads. Neovim stays pinned.
+# Advance package inputs to newest resolving branch heads.
 nix flake update nixpkgs home-manager nixpkgs-latest
 if git diff --quiet -- flake.lock; then
   echo 'Package inputs are already current.'

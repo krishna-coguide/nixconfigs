@@ -182,6 +182,25 @@ let
     }
     {
       assertion =
+        lib.all
+          (
+            c:
+            let
+              home = c.home-manager.users.dev;
+            in
+            home.home.activation ? neovimCheckout
+            && !lib.any (name: name == "nvim" || lib.hasPrefix "nvim/" name) (
+              builtins.attrNames home.xdg.configFile
+            )
+          )
+          [
+            config
+            ec2Config
+          ];
+      message = "~/.config/nvim must be a dev-owned Git checkout on both hosts, not Home Manager links.";
+    }
+    {
+      assertion =
         ec2Config.systemd.services.nixos-update.environment.NIXOS_UPDATE_HOST == "dev"
         && ec2Config.systemd.services.nixos-update.environment.NIXOS_CONFIG_REPO == "/etc/nixos"
         && ec2Config.boot.loader.grub.enable

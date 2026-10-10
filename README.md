@@ -8,7 +8,7 @@ Flat, explicit NixOS modules with locked inputs. Required setup belongs here—n
 
 | File | Owns |
 | --- | --- |
-| `hosts.nix`, `flake.nix`, `flake.lock` | Machine entry table, host construction and exact Nixpkgs/Home Manager/tool/dotfile pins |
+| `hosts.nix`, `flake.nix`, `flake.lock` | Machine entry table, host construction and exact Nixpkgs/Home Manager/tool pins |
 | `common.nix` | Shared environment, locale/timezone, Nix features, update policy and compatibility version |
 | `physical.nix`, `hardware-configuration.nix` | Laptop boot/storage, panel scale and CPU sensor; deployment identity comes from `hosts.nix` |
 | `configuration.nix` | AWS boot/storage/network/recovery integration; deployment identity comes from `hosts.nix` |
@@ -17,7 +17,7 @@ Flat, explicit NixOS modules with locked inputs. Required setup belongs here—n
 | `colors.nix`, `wallpaper.nix`, `wallpaper.svg` | Shared One Ring palette, hash-pinned wallpaper and original fallback artwork |
 | `desktop.nix`, `hyprland.lua`, `anyrun.css`, `swaync.css`, `desktop-help.py`, `desktop-actions.py` | Session/bar, launchers, described help, capture, clipboard, notifications, lock/idle and styling |
 | `apps.nix`, `element-nightly.nix` | Firefox ESR, Tor Browser, KeePassXC, Thunderbird, Steam, pinned Element Nightly, Slack, Tauon, GNOME Network Displays, file/media viewers and MIME defaults |
-| `neovim.nix`, `neovim-test.lua` | Unmodified upstream editor deployment and opt-in native runtime audit |
+| `neovim.nix`, `neovim-test.lua` | Neovim, the dev-owned `~/.config/nvim` dotfiles checkout and opt-in native runtime audit |
 | `updates.nix`, `update-system.sh`, `update-test.py` | Shared dev-owned checkouts, daily boot-staged updates and failure/concurrency regression tests |
 | `switch-system.sh`, `switch-test.py` | Same installed manual apply/preview command on both hosts, with host identity supplied by Nix |
 | `physical-test.nix`, `tools-test.nix`, `git-credentials-test.nix` | Physical/AWS safety, shared-policy assertions, offline tool/help smoke tests and disposable Git credential-cache checks |
@@ -351,7 +351,7 @@ If boot fails, choose a known-good systemd-boot generation (hold Space at startu
 
 ## Automatic freshness, precisely
 
-- **Every day**, `nixos-update.timer` runs with up to one hour of jitter and catches missed runs. It advances `nixpkgs`, `home-manager`, and `nixpkgs-latest`; the Neovim source remains fixed.
+- **Every day**, `nixos-update.timer` runs with up to one hour of jitter and catches missed runs. It advances `nixpkgs`, `home-manager`, and `nixpkgs-latest`; it never fetches or changes the Neovim checkout.
 - The system/desktop now follow rolling **`nixos-unstable`** (the latest tested channel) and Home Manager **`master`**, rather than a fixed release branch. Most standalone CLI tools use **Nixpkgs master** for faster updates. They are imported separately, **not** overlaid onto the desktop's GCC/Python/libraries. Flake locks record each resolved snapshot; input updates, not deleting locks, advance Nix-owned packages.
 - **Same policy on both hosts:** run as `dev`, build/check/record and **stage for next boot**. There is no automatic live switch, logout or reboot. Only checkout path and explicit flake target differ: laptop `/etc/nix#nixos`, EC2 `/etc/nixos#dev`. Installed versions change when that generation is booted, or explicitly switched by the user.
 - Both skip dirty/detached repositories, serialize runs with manual switching, use an isolated worktree, check for edits again after dry activation and commit only the tested lock. On staging failure, the updater restores the previously selected **boot generation**, including a generation that was already staged but not running. A failed rollback is reported as failure; recovery generations are retained.
@@ -377,9 +377,9 @@ matching the latest upstream stable release when added. It advances through the
 existing daily input-update workflow. Launch `tauon` or choose **Tauon**
 in the application launcher after applying; existing MIME defaults are unchanged.
 
-Neovim imports [the existing neovim-dots source](https://git.cyber.ayyalasomayajula.net/marsultor/neovim-dots), pinned to `380eb86778a7c53a0f1c18e84f14037456155347`. Lua, AstroNvim, Lazy, Mason, plugins and keymaps are unchanged. No Nixvim, replacement loader or plugin-manager migration.
+Neovim uses [krishna-coguide/nvim-dots](https://github.com/krishna-coguide/nvim-dots) as an ordinary **Git checkout at `~/.config/nvim`**, owned by `dev`. Edit, commit, pull and push there; Lazy updates the tracked `lazy-lock.json` in place. Lua, AstroNvim, Lazy, Mason, plugins and keymaps are unchanged. No Nixvim, replacement loader or plugin-manager migration.
 
-Home Manager links configuration files under `~/.config/nvim`. Lazy's writable lock lives under `~/.local/state/nvim/locks/<revision>.json`, seeded once per dotfile revision. An earlier manual checkout is preserved at `~/projects/neovim-dots-before-nix`; activation refuses to overwrite an existing backup. The host input is reproducible; Lazy/Mason's mutable runtime downloads are not claimed to be fully Nix-reproducible.
+Home Manager activation clones the default branch only when `~/.config/nvim` is missing or empty, after removing links from earlier generations that copied the dotfiles from the Nix store. It never fetches, resets or overwrites an existing checkout; a non-checkout directory is left untouched with a warning. Activation also runs at boot, possibly offline, so a failed clone is a warning that prints the manual `git clone` command, not an activation failure. The checkout is mutable user state, not a Nix pin; Lazy/Mason's runtime downloads are not claimed to be Nix-reproducible. The earlier manual checkout at `~/projects/neovim-dots-before-nix` and the old Lazy lock under `~/.local/state/nvim/locks/` are left in place and no longer used.
 
 As `dev`, the separate runtime audit may download dependencies but does not modify managed Lua or save buffers:
 

@@ -13,11 +13,6 @@
     # Fast-moving standalone apps/tools can advance ahead of the tested channel.
     # flake.lock still records the exact resolved snapshot.
     nixpkgs-latest.url = "github:NixOS/nixpkgs/master";
-
-    neovim-dots = {
-      url = "git+https://git.cyber.ayyalasomayajula.net/marsultor/neovim-dots?ref=main&rev=380eb86778a7c53a0f1c18e84f14037456155347";
-      flake = false;
-    };
   };
 
   outputs =

@@ -21,24 +21,6 @@
         "type": "github"
       }
     },
-    "neovim-dots": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1780499261,
-        "narHash": "sha256-ScMf9MqK4EyEU0/Ki134efrPa8azNxgALnTfgiaLA3w=",
-        "ref": "main",
-        "rev": "380eb86778a7c53a0f1c18e84f14037456155347",
-        "revCount": 17,
-        "type": "git",
-        "url": "https://git.cyber.ayyalasomayajula.net/marsultor/neovim-dots"
-      },
-      "original": {
-        "ref": "main",
-        "rev": "380eb86778a7c53a0f1c18e84f14037456155347",
-        "type": "git",
-        "url": "https://git.cyber.ayyalasomayajula.net/marsultor/neovim-dots"
-      }
-    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1790463110,
@@ -74,7 +56,6 @@
     "root": {
       "inputs": {
         "home-manager": "home-manager",
-        "neovim-dots": "neovim-dots",
         "nixpkgs": "nixpkgs",
         "nixpkgs-latest": "nixpkgs-latest"
       }
