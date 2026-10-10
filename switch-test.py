@@ -15,6 +15,18 @@ name = pathlib.Path(sys.argv[0]).name
 args = sys.argv[1:]
 with open(os.environ["CALLS"], "a") as f:
     f.write(json.dumps([name, *args]) + "\n")
+if name == "id":
+    # Only the dev account lookup; a fresh machine does not have it yet.
+    assert args == ["-u", "dev"], args
+    if os.environ["SCENARIO"] == "no-dev-user": sys.exit(1)
+    print(1001)
+    sys.exit(0)
+if name == "sudo" and os.environ["SCENARIO"] == "no-dev-user":
+    # Account creation re-runs the same script as root with the same target.
+    assert args == ["env", "NIXOS_CONFIG_REPO=" + os.environ["NIXOS_CONFIG_REPO"],
+                    "NIXOS_UPDATE_HOST=" + os.environ["NIXOS_UPDATE_HOST"],
+                    os.environ["SCRIPT"], *json.loads(os.environ["ARGS"])], args
+    sys.exit(0)
 if name in ("nix", "sudo"):
     # Model sudo's descriptor cleanup: the parent shell must retain the lock.
     try: os.close(9)
@@ -25,7 +37,7 @@ if name in ("nix", "sudo"):
         else: raise AssertionError("Updater lock was released before activation completed")
 if name == "nix":
     assert pathlib.Path.cwd() == pathlib.Path(os.environ["NIXOS_CONFIG_REPO"])
-    assert args == ["build", f'.#nixosConfigurations.{os.environ["NIXOS_UPDATE_HOST"]}.config.system.build.toplevel', "--no-update-lock-file", "--no-link", "--print-out-paths"]
+    assert args == ["--extra-experimental-features", "nix-command flakes", "build", f'.#nixosConfigurations.{os.environ["NIXOS_UPDATE_HOST"]}.config.system.build.toplevel', "--no-update-lock-file", "--no-link", "--print-out-paths"]
     if os.environ["SCENARIO"] == "build-failure": sys.exit(42)
     print(os.environ["BUILT"])
 elif name == "sudo":
@@ -46,13 +58,13 @@ with tempfile.TemporaryDirectory(prefix="switch-test-") as directory:
     calls = root / "calls"
     repo.mkdir()
     binaries.mkdir()
-    for name in ["nix", "sudo"]:
+    for name in ["id", "nix", "sudo"]:
         executable = binaries / name
         executable.write_text("#!" + sys.executable + "\n" + mock)
         executable.chmod(0o755)
     env = dict(os.environ, PATH=str(binaries) + os.pathsep + os.environ["PATH"],
                NIXOS_CONFIG_REPO=str(repo), CACHE_DIRECTORY=str(root / "cache"),
-               CALLS=str(calls), BUILT=str(root / "built system"))
+               CALLS=str(calls), BUILT=str(root / "built system"), SCRIPT=str(script))
     # Source execution must never infer a target from the login name or silently
     # choose laptop boot/storage on EC2. Help still works before configuration.
     for host in [None, ""]:
@@ -81,22 +93,28 @@ with tempfile.TemporaryDirectory(prefix="switch-test-") as directory:
              (["--help"], None, "help", 0), (["invalid"], None, "invalid", 2),
              (["switch", "extra"], None, "invalid", 2),
              ([], None, "build-failure", 42), ([], "switch", "sudo-failure", 43),
-             ([], "switch", "activation-failure", 44), ([], None, "invalid-host", 2)]
+             ([], "switch", "activation-failure", 44), ([], None, "invalid-host", 2),
+             ([], None, "no-dev-user", 0), (["boot"], None, "no-dev-user", 0)]
     for host in ["nixos", "dev", "gpu-worker_1"]:
         for args, action, scenario, expected_code in cases:
             calls.unlink(missing_ok=True)
             result = subprocess.run(
                 ["bash", str(script), *args], cwd=root,
                 env=env | {"NIXOS_UPDATE_HOST": "bad/host" if scenario == "invalid-host" else host,
-                           "SCENARIO": scenario}, text=True, capture_output=True,
+                           "SCENARIO": scenario, "ARGS": json.dumps(args)},
+                text=True, capture_output=True,
             )
             assert result.returncode == expected_code, (host, scenario, result.stdout, result.stderr)
             log = [json.loads(line) for line in calls.read_text().splitlines()] if calls.exists() else []
             if action:
-                assert [call[0] for call in log] == ["nix", "sudo"], log
+                assert [call[0] for call in log] == ["id", "nix", "sudo"], log
                 assert log[-1][2] == action, log
             elif scenario == "build-failure":
-                assert [call[0] for call in log] == ["nix"], log
+                assert [call[0] for call in log] == ["id", "nix"], log
+            elif scenario == "no-dev-user":
+                # Nothing is built or locked before the root re-run creates dev.
+                assert [call[0] for call in log] == ["id", "sudo"], log
+                assert "re-running with sudo" in result.stderr, result.stderr
             else:
                 assert not log, log
             print("PASS", host, args or ["default"], scenario)

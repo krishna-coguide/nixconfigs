@@ -284,6 +284,15 @@ NIXOS_CONFIG_REPO="$PWD" NIXOS_UPDATE_HOST=dev ./switch-system.sh dry-activate
 NIXOS_CONFIG_REPO="$PWD" NIXOS_UPDATE_HOST=dev ./switch-system.sh boot
 ```
 
+**Fresh NixOS machine:** if the `dev` account does not exist yet, the script creates it as `users.nix` declares it (UID 1001, group `users`, `wheel`, `/home/dev` mode 0700), re-running itself through `sudo` when needed. It sets no password. Invoked as root, it also gives `dev` ownership of the checkout and the updater cache/lock (exactly what `updates.nix` enforces after activation), builds as `dev` with flakes enabled for that command only, and activates directly as root, because `dev`'s sudo rule only exists after the first activation. Activation then applies the shell, SSH keys and sudo rule. For example, after cloning this repository to the host's checkout path:
+
+```sh
+cd /etc/nixos
+sudo NIXOS_CONFIG_REPO="$PWD" NIXOS_UPDATE_HOST=dev ./switch-system.sh boot
+```
+
+The target still needs its own entry and hardware module in `hosts.nix`; set a password with `sudo passwd dev` if the host needs local logins.
+
 Use `switch` instead of `boot` only when you intend to apply immediately. On the **laptop**, use `NIXOS_UPDATE_HOST=nixos`. EC2's installed command and updater still use `/etc/nixos#dev`; running the source script from `/etc/nix` does not change that deployment path. Automatic updates, unlike an explicit manual switch, **always stage for the next boot on both hosts**.
 
 If EC2 reports `efiSysMountPoint = '/boot' is not a mounted partition` after building `#nixos`, the wrong host was selected: `physical.nix` expects the laptop's EFI partition and Btrfs UUIDs, while `configuration.nix` retains EC2's GRUB and ext4 storage. Do not format or invent an EFI partition to work around it. Select `#dev` and inspect the system profile as described under Recovery; a failed bootloader installation can still leave the wrong generation selected.
