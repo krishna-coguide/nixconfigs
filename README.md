@@ -381,9 +381,9 @@ Manual refresh: `nix flake update nixpkgs home-manager nixpkgs-latest`, review `
 ## Editor and application data
 
 **Tauon** is installed for `dev` from `nixpkgs-latest` (Nixpkgs master), with the
-exact snapshot recorded in `flake.lock`. The current pin provides **12.0.0**,
-matching the latest upstream stable release when added. It advances through the
-existing daily input-update workflow. Launch `tauon` or choose **Tauon**
+exact snapshot recorded in `flake.lock`. The current pin provides **12.1.0**;
+newer upstream releases arrive once packaged in Nixpkgs master. It advances through
+the existing daily input-update workflow. Launch `tauon` or choose **Tauon**
 in the application launcher after applying; existing MIME defaults are unchanged.
 
 Neovim uses [krishna-coguide/nvim-dots](https://github.com/krishna-coguide/nvim-dots) as an ordinary **Git checkout at `~/.config/nvim`**, owned by `dev`. Edit, commit, pull and push there; Lazy updates the tracked `lazy-lock.json` in place. Lua, AstroNvim, Lazy, Mason, plugins and keymaps are unchanged. No Nixvim, replacement loader or plugin-manager migration.

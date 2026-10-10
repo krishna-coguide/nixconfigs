@@ -393,20 +393,9 @@ in
       '';
     };
 
-    # This pinned launcher needs a daemon for calculator copy-to-clipboard.
-    systemd.user.services.anyrun = {
-      Unit = {
-        Description = "Application launcher and calculator";
-        After = [ "graphical-session.target" ];
-        PartOf = [ "graphical-session.target" ];
-        ConditionEnvironment = "WAYLAND_DISPLAY";
-      };
-      Service = {
-        ExecStart = "${pkgs.anyrun}/bin/anyrun daemon";
-        Restart = "on-failure";
-      };
-      Install.WantedBy = [ "graphical-session.target" ];
-    };
+    # Calculator copy-to-clipboard needs the daemon; Home Manager owns its unit.
+    programs.anyrun.daemon.enable = true;
+    systemd.user.services.anyrun.Unit.ConditionEnvironment = "WAYLAND_DISPLAY";
 
     # Fuzzel is the shared dmenu-style picker for actions/help; Anyrun remains
     # the app launcher/calculator, not a second competing autostarted shell.
