@@ -4,10 +4,10 @@
 { pkgs }:
 pkgs.stdenv.mkDerivation rec {
   pname = "tastytrade";
-  version = "0.58.0";
+  version = "0.61.0";
   src = pkgs.fetchurl {
     url = "https://download.tastytrade.com/desktop-2.0/tastytrade-linux-amd64-${version}.deb";
-    hash = "sha256-aH4NcjxF/B4vJAM7vv/ntiOnetaylPgAZm+qJx8Pt8I=";
+    hash = "sha256-oQTjnqpaiIOg55MDlvXnWzmL9/CATMJfHHbvmCooozQ=";
   };
   nativeBuildInputs = with pkgs; [
     dpkg
