@@ -130,6 +130,8 @@ in
       tastytrade
       # Same keyring rule for Chrome: KeePassXC Secret Service, not basic.
       (google-chrome.override { commandLineArgs = "--password-store=gnome-libsecret"; })
+      # Screen capture goes through the existing PipeWire/screencast portal.
+      obs-studio
     ];
     # Fix the pinned package's stale launcher command, preserving its metadata.
     xdg.dataFile."applications/tauonmb.desktop".source = pkgs.runCommand "tauonmb.desktop" { } ''
