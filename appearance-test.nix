@@ -50,7 +50,7 @@ pkgs.runCommand "desktop-appearance-check"
     done
     fc-match --format='%{family}' emoji | grep -Fq 'Noto Color Emoji'
     fc-match --format='%{family}' ':charset=4e00' | grep -Fq 'Noto Sans CJK'
-    test -r ${theme}/share/sddm/themes/sddm-astronaut-theme/Backgrounds/one-ring.jpg
+    test -r ${theme}/share/sddm/themes/sddm-astronaut-theme/Backgrounds/wallpaper.png
     export QT_QUICK_BACKEND=software LIBGL_ALWAYS_SOFTWARE=1 QT_QPA_PLATFORM=xcb
     xvfb-run -a -s '-screen 0 1920x1080x24' ${pkgs.runtimeShell} -euc '
       ${sddm}/bin/sddm-greeter-qt6 --test-mode \

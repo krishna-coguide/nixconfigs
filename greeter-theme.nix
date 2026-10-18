@@ -13,7 +13,7 @@ in
     HeaderText = "Welcome back";
     HourFormat = "HH:mm";
     DateFormat = "dddd d MMMM";
-    Background = "Backgrounds/one-ring.jpg";
+    Background = "Backgrounds/wallpaper.png";
     DimBackground = "0.15";
     CropBackground = "true";
     FormPosition = "left";
@@ -60,6 +60,6 @@ in
     postInstall = (old.postInstall or "") + ''
       # The theme resolves background paths relative to its own directory.
       chmod u+w "$out/share/sddm/themes/sddm-astronaut-theme/Backgrounds"
-      ln -s ${wallpaper} "$out/share/sddm/themes/sddm-astronaut-theme/Backgrounds/one-ring.jpg"
+      ln -s ${wallpaper} "$out/share/sddm/themes/sddm-astronaut-theme/Backgrounds/wallpaper.png"
     '';
   })

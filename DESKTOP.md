@@ -76,16 +76,7 @@ The native audit caught real issues that configuration evaluation did not: neste
 
 ## Wallpaper provenance
 
-[Wallhaven 01e5v4](https://wallhaven.cc/w/01e5v4), a dark One Ring inscription, **1920×1200**. Wallhaven lists uploader **ulairi88**, not a verified original artist, and provides no redistribution license. No artist attribution or open license is invented.
-
-`wallpaper.nix` fetches immutable bytes:
-
-```text
-https://w.wallhaven.cc/full/01/wallhaven-01e5v4.jpg
-sha256-3jkKzJ0q4MTlHygwUs3SuSiUIjUjkiTqSaM+q8EL/oc=
-```
-
-No wallpaper service is contacted at login. `wallpaper.svg` remains the original locally authored alternative. Existing generations retain the fetched image if the source later disappears.
+`wallpaper.png` (1536×1024) is tracked in this repository and referenced by `wallpaper.nix` as a local path, so no wallpaper service is contacted at build or login. `wallpaper.svg` remains the original locally authored alternative.
 
 ## Reference, not imitation
 

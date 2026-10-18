@@ -14,7 +14,7 @@ Flat, explicit NixOS modules with locked inputs. Required setup belongs here—n
 | `configuration.nix` | AWS boot/storage/network/recovery integration; deployment identity comes from `hosts.nix` |
 | `users.nix` | `dev`, SSH authorization, sudo, Home Manager and workspace ownership |
 | `tools.nix`, `network.nix` | Development toolkit, terminal/shell, rootless Podman, VPN/proxy clients, local Tor service and network diagnostics |
-| `colors.nix`, `wallpaper.nix`, `wallpaper.svg` | Shared One Ring palette, hash-pinned wallpaper and original fallback artwork |
+| `colors.nix`, `wallpaper.nix`, `wallpaper.png`, `wallpaper.svg` | Shared One Ring palette, local wallpaper image and original fallback artwork |
 | `desktop.nix`, `hyprland.lua`, `anyrun.css`, `swaync.css`, `desktop-help.py`, `desktop-actions.py` | Session/bar, launchers, described help, capture, clipboard, notifications, lock/idle and styling |
 | `apps.nix`, `element-nightly.nix` | Firefox ESR, Tor Browser, KeePassXC, Thunderbird, Steam, pinned Element Nightly, Slack, Tauon, GNOME Network Displays, file/media viewers and MIME defaults |
 | `neovim.nix`, `neovim-test.lua` | Neovim, the dev-owned `~/.config/nvim` dotfiles checkout and opt-in native runtime audit |
