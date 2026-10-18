@@ -10,9 +10,16 @@
   ];
 
   boot.loader = {
-    systemd-boot.enable = true;
+    systemd-boot = {
+      enable = true;
+      configurationLimit = 8;
+    };
     efi.canTouchEfiVariables = true;
+    timeout = 8;
   };
+
+  # The installed root is the Btrfs top level; keep it explicit after resizing.
+  fileSystems."/".options = [ "subvolid=5" ];
   networking.hostName = "nixos";
 
   # 1440x900 logical pixels; leave other displays on automatic scaling.
