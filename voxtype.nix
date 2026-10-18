@@ -42,7 +42,7 @@ in
       model.path = model; # Becomes parakeet.model; do not also set a name.
       service.enable = true;
       settings = {
-        hotkey.enabled = false; # Hyprland binding below runs `voxtype record toggle`.
+        hotkey.enabled = false; # hyprland.lua binds the Copilot key to `voxtype record toggle`.
         osd.enabled = false; # No frontend is packaged; the bar's Privacy module shows the live mic.
         parakeet = {
           model_type = "tdt"; # int8 file names defeat Voxtype's auto-detection.
@@ -50,8 +50,5 @@ in
         };
       };
     };
-    wayland.windowManager.hyprland.extraConfig = lib.mkAfter ''
-      bind("SUPER + V", hl.dsp.exec_cmd("${package}/bin/voxtype record toggle"), "Input · Dictation start / stop")
-    '';
   };
 }

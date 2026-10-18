@@ -67,7 +67,7 @@ Never change permissions on `/run/user/0` to work around this.
 | `Super-Alt-V` | Clipboard history |
 | `Print`, `Super-Shift-S` | Screenshot menu / region annotation |
 | `Super-Alt-R` | Start/stop recording; red REC indicator when active |
-| `Super-V` | Start/stop local dictation; text is typed at the cursor (laptop) |
+| Copilot key | Start/stop local dictation; text is typed at the cursor (laptop) |
 | `Super-N`, `Super-Alt-E` | Night light / emoji |
 | `Super-A`, `Alt-Tab` | Window search / cycle windows |
 | `Ctrl-R`, `Ctrl-T`, `Alt-C` in Zsh | fzf history / files / directories |
@@ -253,7 +253,7 @@ torsocks curl --fail --show-error --max-time 60 https://check.torproject.org/api
 
 ### Dictation (laptop only)
 
-`voxtype.nix` runs the Voxtype user daemon with the Parakeet TDT 0.6B v3 int8 model, fetched from a pinned Hugging Face commit into the store. `Super-V` starts and stops a recording, and the transcript is typed with `wtype`, falling back to the clipboard. Everything stays on the machine. The model loads only while transcribing and is freed afterwards, so the idle daemon stays small. Hosts that import `nvidia.nix` (`hardware.nvidia.enabled`) get the CUDA build, which falls back to CPU. No CUDA binary cache is configured, so the first build on such a host compiles ONNX Runtime from source. The input is pinned to a release tag; bump it by hand.
+`voxtype.nix` runs the Voxtype user daemon with the Parakeet TDT 0.6B v3 int8 model, fetched from a pinned Hugging Face commit into the store. The Copilot key (bound in `hyprland.lua`) starts and stops a recording, and the transcript is typed with `wtype`, falling back to the clipboard. Everything stays on the machine. The model loads only while transcribing and is freed afterwards, so the idle daemon stays small. Hosts that import `nvidia.nix` (`hardware.nvidia.enabled`) get the CUDA build, which falls back to CPU. No CUDA binary cache is configured, so the first build on such a host compiles ONNX Runtime from source. The input is pinned to a release tag; bump it by hand.
 
 ## Build and apply
 
