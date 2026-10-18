@@ -13,6 +13,12 @@
     # Fast-moving standalone apps/tools can advance ahead of the tested channel.
     # flake.lock still records the exact resolved snapshot.
     nixpkgs-latest.url = "github:NixOS/nixpkgs/master";
+
+    # Local dictation; pinned to a release tag (the daily update leaves it alone).
+    voxtype = {
+      url = "github:peteonrails/voxtype/v1.1.1";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -76,6 +82,7 @@
         network = ./network.nix;
         workstation = ./workstation.nix;
         nvidia = ./nvidia.nix;
+        voxtype = ./voxtype.nix;
       };
       checks.x86_64-linux =
         let

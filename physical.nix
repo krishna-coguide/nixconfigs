@@ -7,6 +7,7 @@
     ./common.nix
     ./workstation.nix
     ./libvirt.nix
+    ./voxtype.nix
   ];
 
   boot.loader = {

@@ -24,6 +24,7 @@ Flat, explicit NixOS modules with locked inputs. Required setup belongs here—n
 | `desktop-test.nix`, `desktop-test.py`, `audit-desktop.sh` | Disposable graphical/PAM/audio/scaling audit |
 | `workstation.nix`, `greeter-theme.nix`, `appearance-test.nix` | Local hardware/SDDM integration, Wi-Fi Display networking, One Ring login theme and isolated rendering/font check |
 | `libvirt.nix` | Laptop-only libvirt/KVM host with virt-manager, emulated TPM and SPICE USB redirection |
+| `voxtype.nix` | Laptop-only local push-to-talk dictation (Voxtype, Parakeet); CUDA build only where `nvidia.nix` enables the driver |
 | `nvidia.nix`, `cuda.nix`, `cuda-check.cu`, [NVIDIA.md](NVIDIA.md) | Opt-in proprietary NVIDIA driver, installed CUDA SDK/cuDNN, Podman CDI and GPU setup guide |
 | [DESKTOP.md](DESKTOP.md) | Live audit, wallpaper provenance, JaKooLit comparison and explicit feature-completion plan |
 | [`templates/agent/`](templates/agent/README.md), `agent-template-test.nix` | Copyable DSH devShell example, built-in Bubblewrap sandbox guide and offline example check |
@@ -66,6 +67,7 @@ Never change permissions on `/run/user/0` to work around this.
 | `Super-Alt-V` | Clipboard history |
 | `Print`, `Super-Shift-S` | Screenshot menu / region annotation |
 | `Super-Alt-R` | Start/stop recording; red REC indicator when active |
+| `Super-V` | Start/stop local dictation; text is typed at the cursor (laptop) |
 | `Super-N`, `Super-Alt-E` | Night light / emoji |
 | `Super-A`, `Alt-Tab` | Window search / cycle windows |
 | `Ctrl-R`, `Ctrl-T`, `Alt-C` in Zsh | fzf history / files / directories |
@@ -248,6 +250,10 @@ torsocks curl --fail --show-error --max-time 60 https://check.torproject.org/api
 
 - `/var/lib/libvirt/images` has Btrfs copy-on-write disabled for new files.
 - USB devices can be redirected on demand from the SPICE viewer (*Virtual Machine → Redirect USB device*).
+
+### Dictation (laptop only)
+
+`voxtype.nix` runs the Voxtype user daemon with the Parakeet TDT 0.6B v3 int8 model, fetched from a pinned Hugging Face commit into the store. `Super-V` starts and stops a recording, and the transcript is typed with `wtype`, falling back to the clipboard. Everything stays on the machine. The model loads only while transcribing and is freed afterwards, so the idle daemon stays small. Hosts that import `nvidia.nix` (`hardware.nvidia.enabled`) get the CUDA build, which falls back to CPU. No CUDA binary cache is configured, so the first build on such a host compiles ONNX Runtime from source. The input is pinned to a release tag; bump it by hand.
 
 ## Build and apply
 
