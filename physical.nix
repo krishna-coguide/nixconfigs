@@ -6,7 +6,7 @@
     ./hardware-configuration.nix
     ./common.nix
     ./workstation.nix
-    ./windows-vm.nix
+    ./libvirt.nix
   ];
 
   boot.loader = {

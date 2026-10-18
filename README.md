@@ -23,7 +23,7 @@ Flat, explicit NixOS modules with locked inputs. Required setup belongs here—n
 | `physical-test.nix`, `tools-test.nix`, `git-credentials-test.nix` | Physical/AWS safety, shared-policy assertions, offline tool/help smoke tests and disposable Git credential-cache checks |
 | `desktop-test.nix`, `desktop-test.py`, `audit-desktop.sh` | Disposable graphical/PAM/audio/scaling audit |
 | `workstation.nix`, `greeter-theme.nix`, `appearance-test.nix` | Local hardware/SDDM integration, Wi-Fi Display networking, One Ring login theme and isolated rendering/font check |
-| `windows-vm.nix` | Laptop-only libvirt/KVM Windows 11 guest: TPM/Secure Boot, webcam passthrough and SPICE microphone/audio |
+| `libvirt.nix` | Laptop-only libvirt/KVM host with virt-manager, emulated TPM and SPICE USB redirection |
 | `nvidia.nix`, `cuda.nix`, `cuda-check.cu`, [NVIDIA.md](NVIDIA.md) | Opt-in proprietary NVIDIA driver, installed CUDA SDK/cuDNN, Podman CDI and GPU setup guide |
 | [DESKTOP.md](DESKTOP.md) | Live audit, wallpaper provenance, JaKooLit comparison and explicit feature-completion plan |
 | [`templates/agent/`](templates/agent/README.md), `agent-template-test.nix` | Copyable DSH devShell example, built-in Bubblewrap sandbox guide and offline example check |
@@ -242,24 +242,12 @@ torsocks curl --fail --show-error --max-time 60 https://check.torproject.org/api
 
 `torsocks` and `proxychains4` are opt-in wrappers, not sandboxes: static binaries and applications that bypass their hooks are not reliably covered. Tor carries TCP, not arbitrary UDP/ICMP; do not assume tools such as fping, raw-packet nmap or traceroute run through it. Keep ordinary DNS lookups out of workflows that require Tor-side resolution. **Tor Browser is installed by `apps.nix`**: launch `tor-browser` or select **Tor Browser** in the application launcher after applying the configuration. It retains its separate profile and upstream privacy defaults; Firefox remains the default browser. Tor Browser is not simply a generic browser pointed at the system SOCKS port, and it is not auto-started.
 
-### Windows 11 VM (laptop only)
+### Virtual machines (laptop only)
 
-`windows-vm.nix` runs a KVM guest named `windows` under system libvirt. QEMU and its emulated TPM run as `qemu-libvirtd`, not root. It has 4 vCPUs, 12 GiB RAM, Secure Boot with Microsoft keys, TPM 2.0, Hyper-V enlightenments, a sparse 128 GiB virtio disk, virtio networking on libvirt's NAT `default` network and virtio video. **The domain XML in the module is authoritative:** `libvirt-define-windows.service` redefines it on every boot/activation, so virt-manager edits do not persist. Disk, NVRAM and TPM state under `/var/lib/libvirt` are never recreated. The guest never autostarts, and the host asks it to shut down cleanly.
+`libvirt.nix` enables system libvirt (QEMU/KVM) and virt-manager; no guests are declared, so create and manage them in virt-manager, which auto-connects to `qemu:///system`. `dev` is in the `libvirtd` group and `LIBVIRT_DEFAULT_URI` points `virsh` at the same connection. QEMU and the emulated TPM (swtpm) run as `qemu-libvirtd`, not root. Guests never autostart, and the host asks them to shut down cleanly.
 
-- **Webcam:** the integrated USB camera (`5986:11ac`) is passed through while the guest runs, so the host cannot use it then. If it is missing, the guest still starts.
-- **Microphone and speakers:** the internal mic is not a USB device. It reaches Windows through SPICE audio, captured by the viewer's PipeWire session, so the mic works only while a virt-manager/virt-viewer console is open.
-- **Other USB devices**, such as a headset, can be redirected on demand from the viewer (*Virtual Machine → Redirect USB device*).
-- `/var/lib/libvirt/images` has Btrfs copy-on-write disabled for new files. `virtio-win.iso` there links to the pinned driver ISO.
-
-First install:
-
-```sh
-# Download the Windows 11 x64 ISO from https://www.microsoft.com/software-download/windows11
-sudo mv ~/Downloads/Win11_*.iso /var/lib/libvirt/images/Win11.iso
-virt-manager --connect qemu:///system --show-domain-console windows   # then Run
-```
-
-Press a key at *Press any key to boot from CD*. At disk selection choose **Load driver → `E:\viostor\w11\amd64`** (the virtio-win CD may use a different letter). After setup, run `virtio-win-guest-tools.exe` from that CD. It installs the network, video, balloon, SPICE agent (clipboard/resize) and guest agent drivers. Once Windows is installed, the ISO can be deleted; the guest still boots without it.
+- `/var/lib/libvirt/images` has Btrfs copy-on-write disabled for new files.
+- USB devices can be redirected on demand from the SPICE viewer (*Virtual Machine → Redirect USB device*).
 
 ## Build and apply
 
