@@ -43,6 +43,7 @@ in
       service.enable = true;
       settings = {
         hotkey.enabled = false; # Hyprland binding below runs `voxtype record toggle`.
+        osd.enabled = false; # No frontend is packaged; the bar's Privacy module shows the live mic.
         parakeet = {
           model_type = "tdt"; # int8 file names defeat Voxtype's auto-detection.
           on_demand_loading = true; # Load on record, unload after; low idle RAM/VRAM.
