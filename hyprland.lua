@@ -68,8 +68,9 @@ bind("SUPER + S", app("desktop search"), "Apps · Search web")
 bind("SUPER + SHIFT + Return", app("desktop scratch"), "Windows · Drop-down terminal")
 bind("SUPER + ALT + R", app("desktop record"), "Capture · Start / stop recording")
 bind("SUPER + ALT + T", app("desktop touchpad"), "Input · Toggle touchpad")
--- The Copilot key sends Super+Shift+XF86Assistant as one chord.
-bind("SUPER + SHIFT + XF86Assistant", hl.dsp.exec_cmd("voxtype record toggle"), "Input · Dictation start / stop")
+-- The Copilot key sends Super+Shift+F23 as one chord (F23's base keysym;
+-- xkb reports XF86Assistant only with those modifiers held).
+bind("SUPER + SHIFT + F23", hl.dsp.exec_cmd("voxtype record toggle"), "Input · Dictation start / stop")
 bind("SUPER + Q", hl.dsp.window.close(), "Windows · Close active window")
 bind("SUPER + Space", hl.dsp.window.float({ action = "toggle" }), "Windows · Toggle floating")
 bind("SUPER + F", hl.dsp.window.fullscreen(), "Windows · Toggle fullscreen (alias)")
