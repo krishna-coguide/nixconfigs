@@ -14,9 +14,10 @@
     # flake.lock still records the exact resolved snapshot.
     nixpkgs-latest.url = "github:NixOS/nixpkgs/master";
 
-    # Local dictation; pinned to a release tag (the daily update leaves it alone).
+    # Local dictation. main only receives release merges (dev is development),
+    # so this follows the newest release; flake.lock records the exact one.
     voxtype = {
-      url = "github:peteonrails/voxtype/v1.1.1";
+      url = "github:peteonrails/voxtype/main";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };

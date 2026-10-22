@@ -30,8 +30,8 @@ trap cleanup EXIT
 
 git worktree add --detach "$work" "$baseline"
 cd "$work"
-# Advance package inputs to newest resolving branch heads.
-nix flake update nixpkgs home-manager nixpkgs-latest
+# Advance every input to its newest resolving branch head.
+nix flake update
 if git diff --quiet -- flake.lock; then
   echo 'Package inputs are already current.'
   exit 0

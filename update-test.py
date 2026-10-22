@@ -17,7 +17,7 @@ with open(os.environ["CALLS"], "a") as f:
     f.write(json.dumps([name, *args]) + "\n")
 if name == "nix":
     if args[:2] == ["flake", "update"]:
-        assert args[2:] == ["nixpkgs", "home-manager", "nixpkgs-latest"]
+        assert args[2:] == []
         if scenario != "unchanged":
             pathlib.Path("flake.lock").write_text('{"revision":2}\n')
     elif args[:2] == ["flake", "check"]:

@@ -255,7 +255,7 @@ torsocks curl --fail --show-error --max-time 60 https://check.torproject.org/api
 
 ### Dictation (laptop only)
 
-`voxtype.nix` runs the Voxtype user daemon with the Parakeet TDT 0.6B v3 int8 model, fetched from a pinned Hugging Face commit into the store. The Copilot key (bound in `hyprland.lua`) starts and stops a recording, and the transcript is typed with `wtype`, falling back to the clipboard. Everything stays on the machine. The model loads only while transcribing and is freed afterwards, so the idle daemon stays small. Hosts where `nvidia.nix` enabled the driver (`hardware.nvidia.enabled`) get the CUDA build, which falls back to CPU. No CUDA binary cache is configured, so the first build on such a host compiles ONNX Runtime from source. The input is pinned to a release tag; bump it by hand.
+`voxtype.nix` runs the Voxtype user daemon with the Parakeet TDT 0.6B v3 int8 model, fetched from a pinned Hugging Face commit into the store. The Copilot key (bound in `hyprland.lua`) starts and stops a recording, and the transcript is typed with `wtype`, falling back to the clipboard. Everything stays on the machine. The model loads only while transcribing and is freed afterwards, so the idle daemon stays small. Hosts where `nvidia.nix` enabled the driver (`hardware.nvidia.enabled`) get the CUDA build, which falls back to CPU. No CUDA binary cache is configured, so the first build on such a host compiles ONNX Runtime from source. The input follows upstream's release branch, so the daily update moves it to each new release.
 
 ## Build and apply
 
@@ -356,7 +356,7 @@ If boot fails, choose a known-good systemd-boot generation (hold Space at startu
 
 ## Automatic freshness, precisely
 
-- **Every day**, `nixos-update.timer` runs with up to one hour of jitter and catches missed runs. It advances `nixpkgs`, `home-manager`, and `nixpkgs-latest`; it never fetches or changes the Neovim checkout.
+- **Every day**, `nixos-update.timer` runs with up to one hour of jitter and catches missed runs. It advances every flake input (`nixpkgs`, `home-manager`, `nixpkgs-latest`, `voxtype`); it never fetches or changes the Neovim checkout.
 - The system/desktop now follow rolling **`nixos-unstable`** (the latest tested channel) and Home Manager **`master`**, rather than a fixed release branch. Most standalone CLI tools use **Nixpkgs master** for faster updates. They are imported separately, **not** overlaid onto the desktop's GCC/Python/libraries. Flake locks record each resolved snapshot; input updates, not deleting locks, advance Nix-owned packages.
 - **Same policy on both hosts:** run as `dev`, build/check/record and **stage for next boot**. There is no automatic live switch, logout or reboot. Only checkout path and explicit flake target differ: laptop `/etc/nix#nixos`, EC2 `/etc/nixos#dev`. Installed versions change when that generation is booted, or explicitly switched by the user.
 - Both skip dirty/detached repositories, serialize runs with manual switching, use an isolated worktree, check for edits again after dry activation and commit only the tested lock. On staging failure, the updater restores the previously selected **boot generation**, including a generation that was already staged but not running. A failed rollback is reported as failure; recovery generations are retained.
@@ -372,7 +372,7 @@ sudo systemctl start nixos-update.service
 sudo less /var/cache/nixos-update/last-success
 ```
 
-Manual refresh: `nix flake update nixpkgs home-manager nixpkgs-latest`, review `flake.lock`, then check/build. `system.stateVersion` / `home.stateVersion` remain `26.05`: they govern compatibility, not package freshness. Channels are disabled; the Nixpkgs registry and `<nixpkgs>` lookup follow the locked system input.
+Manual refresh: `nix flake update`, review `flake.lock`, then check/build. `system.stateVersion` / `home.stateVersion` remain `26.05`: they govern compatibility, not package freshness. Channels are disabled; the Nixpkgs registry and `<nixpkgs>` lookup follow the locked system input.
 
 ## Editor and application data
 
