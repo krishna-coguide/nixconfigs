@@ -95,6 +95,11 @@
             inherit pkgs;
             config = inputs.self.nixosConfigurations.nixos.config;
           };
+          nvidia-config = import ./nvidia-test.nix {
+            inherit inputs pkgs;
+            laptop = inputs.self.nixosConfigurations.nixos.config;
+            ec2 = inputs.self.nixosConfigurations.dev.config;
+          };
           git-credentials = import ./git-credentials-test.nix {
             inherit pkgs;
             config = inputs.self.nixosConfigurations.nixos.config;

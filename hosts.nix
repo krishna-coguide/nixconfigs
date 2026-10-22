@@ -1,5 +1,5 @@
 # Machine entry points. Keep disk/boot hardware in the selected machine module.
-# Add ./nvidia.nix to a GPU host's modules (proprietary defaults; see NVIDIA.md).
+# NVIDIA GPUs are picked up from a host's nixos-facter report (see NVIDIA.md).
 # The attribute name is the exact flake/update target, never the login name.
 {
   dev = {

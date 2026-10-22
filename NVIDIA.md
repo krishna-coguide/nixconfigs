@@ -1,112 +1,106 @@
 # NVIDIA hosts and CUDA
 
-## One host entry, no hardware guessing
+## Detected from the host's hardware report
+
+Every host imports [`nvidia.nix`](nvidia.nix) through `common.nix`. It does
+nothing unless the host's **nixos-facter report** lists an **Ada (RTX 40) or
+newer** NVIDIA GPU, i.e. PCI vendor `10de` with a device ID from `2600`. The
+stock `hardware-configuration.nix` cannot be used for this: `nixos-generate-config`
+never records the GPU. Older NVIDIA cards are not auto-enabled and keep nouveau.
+A host module that sets `services.xserver.videoDrivers = [ "nvidia" ];` itself
+gets the same profile without a report (for example, a GPU cloud instance).
 
 [`hosts.nix`](hosts.nix) is the entry table. Each key is a NixOS flake target;
 `modules` selects that machine's hardware and optional profiles, `system` selects
 its CPU architecture, and `repo` sets its checkout path. The same target/path
 are passed to the installed switch command and updater. Existing `dev` (EC2)
-and `nixos` (the specific laptop) retain their original boot/storage settings.
+and `nixos` (the specific laptop) have no NVIDIA GPU and are unchanged.
 
-For a GPU-equipped EC2 instance, the existing entry becomes:
+For a new PC, generate its hardware module and report **on that machine**
+(from the installer or its current system), review them, and add them to Git:
 
-```nix
-dev = {
-  system = "x86_64-linux";
-  repo = "/etc/nixos";
-  modules = [ ./configuration.nix ./nvidia.nix ];
-};
+```sh
+mkdir -p machines/gpu-box
+sudo nixos-generate-config --show-hardware-config > machines/gpu-box/hardware-configuration.nix
+sudo nix run nixpkgs#nixos-facter -- -o machines/gpu-box/facter.json
 ```
 
-For the existing laptop, add `./nvidia.nix` to its modules **only if it actually
-has a supported NVIDIA card**. Neither current target enables it by default.
-Use `lspci -nnk -d 10de:` to identify the assigned hardware; a GPU in another
-machine or behind an unconfigured VM passthrough is not accessible locally.
-
-For a different physical PC, add a new entry with its **own generated hardware
-module and bootloader configuration**, `./common.nix`, optionally
-`./workstation.nix` for the local desktop, and `./nvidia.nix`. Do not copy
-`physical.nix`: its disk UUIDs, Intel NPU, panel scale and sensor belong to the
-existing laptop. Use `nixos-generate-config` against the new machine/installation,
-review the generated files, and add them to Git. For example:
+Then add an entry with its **own bootloader configuration**, `./common.nix`
+and, for the local desktop, `./workstation.nix`. Do not copy `physical.nix`:
+its disk UUIDs, Intel NPU, panel scale and sensor belong to the existing laptop.
 
 ```nix
 gpu_box = {
   system = "x86_64-linux";
   repo = "/etc/nixos";
   modules = [
-    ./machines/gpu-box/configuration.nix # Your generated hardware + correct bootloader.
+    ./machines/gpu-box/hardware-configuration.nix
+    {
+      hardware.facter.reportPath = ./machines/gpu-box/facter.json;
+      boot.loader.systemd-boot.enable = true; # Match the machine's real boot setup.
+      boot.loader.efi.canTouchEfiVariables = true;
+      networking.hostName = "gpu-box";
+    }
     ./common.nix
-    ./workstation.nix                   # Omit for a headless worker.
-    ./nvidia.nix
+    ./workstation.nix # Omit for a headless worker.
   ];
 };
 ```
 
-Those `machines/` files are yours to create, not fake disks supplied by this
-repository. Select the named target explicitly; the switch/update scripts now
-accept additional simple host names without being edited. Missing targets fail
-Nix builds before activation; no target is inferred from the login name.
-The full desktop/app bundle is currently validated on **x86_64 Linux**. Changing
-`system` is not a promise that all apps, Jetson boards or ARM cloud platforms
-are supported; those need their own platform module and package review.
+The facter report also drives NixOS's own hardware modules: initrd storage and
+input modules, microcode/firmware, Bluetooth and the platform. Those `machines/`
+files are yours to create, not fake disks supplied by this repository. Select
+the named target explicitly; the switch/update scripts accept additional simple
+host names without being edited. Missing targets fail Nix builds before
+activation; no target is inferred from the login name. The full desktop/app
+bundle is validated on **x86_64 Linux** only.
 
-## What importing `nvidia.nix` installs
+## What a detected GPU gets
 
-- **NVIDIA's vendor driver**, from the system pin's **stable** branch, compiled
-  for the selected `boot.kernelPackages`; proprietary kernel module by default.
-- **`nvidia-smi`**, the driver CUDA runtime (`libcuda.so`) and NixOS-managed
-  device nodes/UVM. These come from the driver, not the toolkit.
+- **NVIDIA's vendor driver** from the system pin's **stable** branch, with
+  NVIDIA's **open kernel modules** (recommended for Ada, required for
+  Blackwell), compiled for the selected `boot.kernelPackages`.
+- **`nvidia-smi`**, the driver CUDA runtime (`libcuda.so`), NixOS-managed device
+  nodes/UVM, kernel mode setting and the NVIDIA VA-API driver.
 - **`nvcc`, `cuda-gdb`, `compute-sanitizer`**, CUDA headers, runtime and math
   libraries through Nixpkgs' complete SDK layout, plus **cuDNN**.
 - **`nvtop`**, and **`nvidia-settings`** when a local X/desktop setup is enabled.
 - **NVIDIA Container Toolkit/CDI** when Podman is enabled (it already is in
   `common.nix`); devices are discovered at runtime by the native NixOS module.
-- **`nvidia-persistenced`** by default on headless hosts, not desktop/laptop
-  hosts where holding a dGPU awake would defeat power saving.
+- **Suspend support** on desktops: video memory is preserved in `/var/tmp`, and
+  driver 595+ with the open modules uses kernel suspend notifiers.
+- **`nvidia-persistenced`** on headless hosts only, not desktop/laptop hosts
+  where holding a dGPU awake would defeat power saving.
 
 The SDK is installed system-wide on GPU hosts, with `CUDA_PATH` pointing to its
-Nix store layout. It is not just available in a shell. No NVIDIA `.run` installer,
-manual `/usr/local/cuda` files, Docker daemon, privileged container, global
-`LD_LIBRARY_PATH` or blanket `allowUnfree = true` is needed. CUDA/driver licenses
-are permitted only for the relevant package set/profile. Installing the SDK
-does **not** set global `nixpkgs.config.cudaSupport`: that would rebuild unrelated
-applications against CUDA and greatly expand the closure.
+Nix store layout. No NVIDIA `.run` installer, manual `/usr/local/cuda` files,
+Docker daemon, privileged container, global `LD_LIBRARY_PATH` or blanket
+`allowUnfree = true` is needed. CUDA/driver licenses are permitted only for the
+relevant package set/profile. Installing the SDK does **not** set global
+`nixpkgs.config.cudaSupport`: that would rebuild unrelated applications against
+CUDA and greatly expand the closure.
 
-[`cuda.nix`](cuda.nix) selects one coherent CUDA package set for the installed
-SDK, the development shell and the check binary: the **newest CUDA major**
-Nixpkgs packages, at its newest minor release, so it moves with `flake.lock`
-instead of being pinned. The locked snapshot currently provides **driver
-595.104.02**, **CUDA 13.4**, and its compatible GCC backend. The complete SDK join suits
-software expecting a single `CUDA_PATH`; new Nix package builds should use the
-split redistributables and hooks, as the small check derivation does.
+Nothing is version-pinned here: the driver is Nixpkgs' `stable` branch and
+[`cuda.nix`](cuda.nix) selects the **newest CUDA major** Nixpkgs packages, at its
+newest minor release, so both move with `flake.lock`. The locked snapshot
+currently provides **driver 595.104.02** and **CUDA 13.4**. The same package set
+serves the installed SDK, the development shell and the check binary. The
+complete SDK join suits software expecting a single `CUDA_PATH`; new Nix
+package builds should use the split redistributables and hooks, as the small
+check derivation does.
 
-## Choose the kernel module for the actual GPU
-
-Add a small native NixOS override to that host's `modules` list. No custom GPU
-option framework or impure runtime detection is involved.
-
-| GPU | Override beyond `./nvidia.nix` |
-| --- | --- |
-| Turing, Ampere, Ada, Hopper | None: stable vendor driver with proprietary kernel module |
-| Blackwell and newer | `{ hardware.nvidia.open = true; }` — NVIDIA requires its open kernel module |
-| Maxwell, Pascal, Volta | `{ hardware.nvidia.branch = "legacy_580"; hardware.nvidia.open = false; }` |
-| Kepler and older | Not supported by this full modern CUDA profile; use a separately reviewed legacy stack |
+No renderer variables are forced on the session. libva maps `nvidia-drm` to the
+installed VA-API driver by itself, and Hyprland detects NVIDIA and adjusts its
+cursor and anti-flicker handling. Driver 555+ explicit sync covers Wayland
+frame pacing.
 
 **Open NVIDIA kernel modules are not Nouveau.** They still use the same NVIDIA
-userspace driver, firmware, `nvidia-smi` and proprietary CUDA libraries. NVIDIA's
-595 documentation explicitly limits its proprietary kernel to Turing through
-Hopper. Do not force it on a Blackwell card. NixOS blacklists conflicting Nouveau
-and Nova drivers when this profile is enabled.
+userspace driver, firmware, `nvidia-smi` and proprietary CUDA libraries. NixOS
+blacklists conflicting Nouveau and Nova drivers when this profile is enabled.
+The "CUDA Version" printed by `nvidia-smi` is a driver capability, **not the
+installed SDK version**; use `nvcc --version` for that.
 
-Driver/CUDA compatibility is separate from the card's compute capability.
-CUDA 13 drops offline compilation for pre-Turing devices; CUDA 12.9 and R580
-remain useful for older cards. cuDNN/framework releases have their own GPU
-support matrices and may not support everything the driver does. The "CUDA
-Version" printed by `nvidia-smi` is a driver capability, **not the installed SDK
-version**; use `nvcc --version` for that.
-
-### Hybrid laptops (Intel/AMD + NVIDIA)
+## Hybrid laptops (Intel/AMD + NVIDIA)
 
 Use PRIME offload rather than forcing every application onto NVIDIA:
 
@@ -129,11 +123,15 @@ preservation defaults on for desktop hosts and uses `/var/tmp`; ensure enough
 disk space for VRAM and validate suspend/resume on the real laptop. No forced
 GBM/GL renderer or browser sandbox-disabling variables are set globally.
 
+A **desktop** whose monitors are plugged into the NVIDIA card needs none of
+this, even with the CPU's integrated GPU enabled: the session renders on the
+GPU the firmware booted with, so leave PRIME unset.
+
 Ordinary headless GPU workers do **not** need `hardware.nvidia.datacenter.enable`:
 that NixOS option adds NVLink/NVSwitch Fabric Manager and is not a synonym for
 "no monitor". Specialized multi-GPU fabric and vGPU/GRID deployments require
-matching vendor-specific configuration. WSL uses a Windows-owned driver and
-must not import this Linux kernel-driver profile. GPU passthrough must first
+matching vendor-specific configuration. WSL uses a Windows-owned driver; never
+select the Linux `nvidia` driver there. GPU passthrough must first
 be configured by the hypervisor/provider.
 
 ## Build, activate, then verify
@@ -211,12 +209,15 @@ sandbox or promise passthrough from installing these packages.
 
 ## References checked
 
-- [NVIDIA 595 kernel flavors and GPU support](https://download.nvidia.com/XFree86/Linux-x86_64/595.99.02/README/kernel_open.html)
-- [CUDA 12.9 release notes](https://docs.nvidia.com/cuda/archive/12.9.1/cuda-toolkit-release-notes/index.html)
+- [NVIDIA 595 kernel flavors and GPU support](https://download.nvidia.com/XFree86/Linux-x86_64/595.104.02/README/kernel_open.html)
+- [CUDA release notes](https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html)
 - [CUDA/driver compatibility](https://docs.nvidia.com/deploy/cuda-compatibility/minor-version-compatibility.html)
 - [Nixpkgs CUDA manual](https://github.com/NixOS/nixpkgs/blob/nixos-unstable/doc/languages-frameworks/cuda.section.md)
 - [NixOS NVIDIA module](https://github.com/NixOS/nixpkgs/blob/nixos-unstable/nixos/modules/hardware/video/nvidia.nix)
+- [NixOS Facter](https://nix-community.github.io/nixos-facter/) and the [NixOS wiki NVIDIA page](https://wiki.nixos.org/wiki/NVIDIA)
 
-No NVIDIA hardware is assigned to the EC2 instance used for this change. Build
-and configuration checks cannot certify GPU execution, suspend or display
-behavior on a machine that has not been tested.
+`nix build .#checks.x86_64-linux.nvidia-config` evaluates a synthetic RTX 4090
+desktop from a facter report, a pre-Ada card, the laptop and EC2, without
+building a driver. Neither existing host has an NVIDIA GPU. Configuration
+checks cannot certify GPU execution, suspend or display behavior on a machine
+that has not been tested.

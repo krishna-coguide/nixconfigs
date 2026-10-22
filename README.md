@@ -25,7 +25,7 @@ Flat, explicit NixOS modules with locked inputs. Required setup belongs here—n
 | `workstation.nix`, `greeter-theme.nix`, `appearance-test.nix` | Local hardware/SDDM integration, Wi-Fi Display networking, One Ring login theme and isolated rendering/font check |
 | `libvirt.nix` | Laptop-only libvirt/KVM host with virt-manager, emulated TPM and SPICE USB redirection |
 | `voxtype.nix` | Laptop-only local push-to-talk dictation (Voxtype, Parakeet); CUDA build only where `nvidia.nix` enables the driver |
-| `nvidia.nix`, `cuda.nix`, `cuda-check.cu`, [NVIDIA.md](NVIDIA.md) | Opt-in proprietary NVIDIA driver, installed CUDA SDK/cuDNN, Podman CDI and GPU setup guide |
+| `nvidia.nix`, `cuda.nix`, `cuda-check.cu`, `nvidia-test.nix`, [NVIDIA.md](NVIDIA.md) | NVIDIA driver switched on automatically for Ada or newer GPUs, newest CUDA SDK/cuDNN, Podman CDI, detection check and GPU setup guide |
 | [DESKTOP.md](DESKTOP.md) | Live audit, wallpaper provenance, JaKooLit comparison and explicit feature-completion plan |
 | [`templates/agent/`](templates/agent/README.md), `agent-template-test.nix` | Copyable DSH devShell example, built-in Bubblewrap sandbox guide and offline example check |
 
@@ -129,13 +129,15 @@ git credential-cache exit
 
 ### NVIDIA / CUDA and additional machines
 
-Add `./nvidia.nix` to a GPU machine's `modules` in **`hosts.nix`**. This installs
-NVIDIA's stable proprietary driver, **`nvidia-smi`, `nvcc`, cuda-gdb,
-compute-sanitizer, CUDA libraries/headers, cuDNN and nvtop**, plus CDI support for
-rootless Podman. The driver follows the system kernel/pin; CUDA does not cause
-global CUDA-enabled rebuilds of unrelated applications. Non-GPU hosts remain
-unchanged. Blackwell+ requires `hardware.nvidia.open = true`; older cards and
-hybrid laptops need the native overrides described in [NVIDIA.md](NVIDIA.md).
+Every host imports `nvidia.nix`, and it turns on by itself when the machine's
+**nixos-facter report** (`hardware.facter.reportPath`) lists an **Ada (RTX 40)
+or newer** NVIDIA GPU. It then installs NVIDIA's stable driver with the open
+kernel modules, **`nvidia-smi`, `nvcc`, cuda-gdb, compute-sanitizer, CUDA
+libraries/headers, cuDNN and nvtop**, plus CDI support for rootless Podman. The
+driver follows the system kernel/pin and CUDA is the newest major Nixpkgs
+packages (13 today); neither causes CUDA-enabled rebuilds of unrelated
+applications. Hosts without such a GPU, including this laptop and EC2, are
+unchanged. Hybrid laptops still need PRIME bus IDs; see [NVIDIA.md](NVIDIA.md).
 
 `hosts.nix` is also the entry point for a new machine: give it its own hardware
 module, platform and checkout path, not this laptop's disk UUIDs. Its attribute
@@ -253,7 +255,7 @@ torsocks curl --fail --show-error --max-time 60 https://check.torproject.org/api
 
 ### Dictation (laptop only)
 
-`voxtype.nix` runs the Voxtype user daemon with the Parakeet TDT 0.6B v3 int8 model, fetched from a pinned Hugging Face commit into the store. The Copilot key (bound in `hyprland.lua`) starts and stops a recording, and the transcript is typed with `wtype`, falling back to the clipboard. Everything stays on the machine. The model loads only while transcribing and is freed afterwards, so the idle daemon stays small. Hosts that import `nvidia.nix` (`hardware.nvidia.enabled`) get the CUDA build, which falls back to CPU. No CUDA binary cache is configured, so the first build on such a host compiles ONNX Runtime from source. The input is pinned to a release tag; bump it by hand.
+`voxtype.nix` runs the Voxtype user daemon with the Parakeet TDT 0.6B v3 int8 model, fetched from a pinned Hugging Face commit into the store. The Copilot key (bound in `hyprland.lua`) starts and stops a recording, and the transcript is typed with `wtype`, falling back to the clipboard. Everything stays on the machine. The model loads only while transcribing and is freed afterwards, so the idle daemon stays small. Hosts where `nvidia.nix` enabled the driver (`hardware.nvidia.enabled`) get the CUDA build, which falls back to CPU. No CUDA binary cache is configured, so the first build on such a host compiles ONNX Runtime from source. The input is pinned to a release tag; bump it by hand.
 
 ## Build and apply
 

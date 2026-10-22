@@ -14,6 +14,7 @@
     ./apps.nix
     ./neovim.nix
     ./updates.nix
+    ./nvidia.nix # Inert unless the host has an Ada or newer NVIDIA GPU.
   ];
 
   time.timeZone = "America/Chicago";
