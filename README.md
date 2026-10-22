@@ -357,10 +357,10 @@ If boot fails, choose a known-good systemd-boot generation (hold Space at startu
 ## Automatic freshness, precisely
 
 - **Every day**, `nixos-update.timer` runs with up to one hour of jitter and catches missed runs. It advances every flake input (`nixpkgs`, `home-manager`, `nixpkgs-latest`, `voxtype`); it never fetches or changes the Neovim checkout.
-- The system/desktop now follow rolling **`nixos-unstable`** (the latest tested channel) and Home Manager **`master`**, rather than a fixed release branch. Most standalone CLI tools use **Nixpkgs master** for faster updates. They are imported separately, **not** overlaid onto the desktop's GCC/Python/libraries. Flake locks record each resolved snapshot; input updates, not deleting locks, advance Nix-owned packages.
+- The system/desktop now follow rolling **`nixos-unstable`** (the latest tested channel) and Home Manager **`master`**, rather than a fixed release branch. Most standalone CLI tools use **`nixpkgs-unstable`** for faster updates: it runs ahead of `nixos-unstable` but, unlike Nixpkgs master, only advances to commits Hydra has built and cached. They are imported separately, **not** overlaid onto the desktop's GCC/Python/libraries. Flake locks record each resolved snapshot; input updates, not deleting locks, advance Nix-owned packages.
 - **Same policy on both hosts:** run as `dev`, build/check/record and **stage for next boot**. There is no automatic live switch, logout or reboot. Only checkout path and explicit flake target differ: laptop `/etc/nix#nixos`, EC2 `/etc/nixos#dev`. Installed versions change when that generation is booted, or explicitly switched by the user.
 - Both skip dirty/detached repositories, serialize runs with manual switching, use an isolated worktree, check for edits again after dry activation and commit only the tested lock. On staging failure, the updater restores the previously selected **boot generation**, including a generation that was already staged but not running. A failed rollback is reported as failure; recovery generations are retained.
-- **“Current” means newest successfully checked/built versions packaged in those branch heads**, not a guarantee of every upstream release immediately. Master can contain breakage and uncached builds; failure retains the previous working generation. Upstream Pi, Mason/plugin downloads, browser add-ons, firmware and project dependencies are separate update boundaries. No runtime self-updater is bolted on to override Nix-owned executables.
+- **“Current” means newest successfully checked/built versions packaged in those branch heads**, not a guarantee of every upstream release immediately. A failed update retains the previous working generation. Upstream Pi, Mason/plugin downloads, browser add-ons, firmware and project dependencies are separate update boundaries. No runtime self-updater is bolted on to override Nix-owned executables.
 - The updater does not fetch/merge repository code from origin. Configuration code is reviewed separately. A dirty working tree intentionally prevents automatic input changes until work is committed/stashed.
 
 Inspect or trigger:
@@ -376,9 +376,9 @@ Manual refresh: `nix flake update`, review `flake.lock`, then check/build. `syst
 
 ## Editor and application data
 
-**Tauon** is installed for `dev` from `nixpkgs-latest` (Nixpkgs master), with the
+**Tauon** is installed for `dev` from `nixpkgs-latest` (`nixpkgs-unstable`), with the
 exact snapshot recorded in `flake.lock`. The current pin provides **12.1.0**;
-newer upstream releases arrive once packaged in Nixpkgs master. It advances through
+newer upstream releases arrive once packaged and built in `nixpkgs-unstable`. It advances through
 the existing daily input-update workflow. Launch `tauon` or choose **Tauon**
 in the application launcher after applying; existing MIME defaults are unchanged.
 

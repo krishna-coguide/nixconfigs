@@ -11,8 +11,10 @@
     };
 
     # Fast-moving standalone apps/tools can advance ahead of the tested channel.
+    # nixpkgs-unstable only moves to commits Hydra has built, unlike master, so
+    # these stay current without compiling uncached or broken packages.
     # flake.lock still records the exact resolved snapshot.
-    nixpkgs-latest.url = "github:NixOS/nixpkgs/master";
+    nixpkgs-latest.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
     # Local dictation. main only receives release merges (dev is development),
     # so this follows the newest release; flake.lock records the exact one.

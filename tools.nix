@@ -119,7 +119,17 @@ in
     taplo
     marksman
     markdownlint-cli2
-    sqlfluff
+    # diff-cover's HTML snapshot tests predate Pygments escaping quotes as
+    # &quot;, so Hydra has no sqlfluff. Skip only those; drop once it is cached.
+    (sqlfluff.override {
+      python3Packages = python3Packages.overrideScope (
+        _: super: {
+          diff-cover = super.diff-cover.overridePythonAttrs (old: {
+            disabledTestPaths = (old.disabledTestPaths or [ ]) ++ [ "tests/test_integration.py" ];
+          });
+        }
+      );
+    })
     hadolint
     ast-grep
     ripgrep-all
