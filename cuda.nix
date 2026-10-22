@@ -2,9 +2,15 @@
 # Use a Nixpkgs instance that permits NVIDIA's CUDA licenses, not global cudaSupport.
 { pkgs }:
 let
-  cuda = pkgs.cudaPackages; # Nixpkgs' widely-supported default, currently CUDA 12.9.
+  inherit (pkgs) lib;
+  # The newest CUDA major Nixpkgs packages (CUDA 13 today), at its newest
+  # minor release; flake.lock alone decides which that is.
+  majors = lib.filter (name: builtins.match "cudaPackages_[0-9]+" name != null) (
+    builtins.attrNames pkgs
+  );
+  cuda = pkgs.${lib.last (lib.sort (a: b: lib.versionOlder (lib.removePrefix "cudaPackages_" a) (lib.removePrefix "cudaPackages_" b)) majors)};
   toolkit = cuda.cudatoolkit; # Complete upstream compatibility layout for SDK consumers.
-  architecture = if cuda.cudaAtLeast "13.0" then "75" else "52";
+  architecture = "75"; # PTX for CUDA 13's oldest target; the driver JIT-compiles it for Ada+.
 in
 {
   inherit toolkit;

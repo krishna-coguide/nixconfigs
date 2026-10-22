@@ -74,10 +74,10 @@ does **not** set global `nixpkgs.config.cudaSupport`: that would rebuild unrelat
 applications against CUDA and greatly expand the closure.
 
 [`cuda.nix`](cuda.nix) selects one coherent CUDA package set for the installed
-SDK, the development shell and the check binary. The locked snapshot currently
-provides **driver 595.99.02**, **CUDA 12.9**, and its compatible GCC backend.
-We deliberately use Nixpkgs' widely-supported CUDA default, not the newest CUDA
-major regardless of framework compatibility. The complete SDK join suits
+SDK, the development shell and the check binary: the **newest CUDA major**
+Nixpkgs packages, at its newest minor release, so it moves with `flake.lock`
+instead of being pinned. The locked snapshot currently provides **driver
+595.104.02**, **CUDA 13.4**, and its compatible GCC backend. The complete SDK join suits
 software expecting a single `CUDA_PATH`; new Nix package builds should use the
 split redistributables and hooks, as the small check derivation does.
 
