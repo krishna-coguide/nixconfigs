@@ -9,6 +9,19 @@ let
     inherit (pkgs.stdenv.hostPlatform) system;
     config = pkgs.config;
   };
+  inherit (pkgs) lib;
+  # The newest stable release of a versioned package family, e.g. jdk25 over
+  # jdk21, so toolchains follow flake.lock rather than a version pinned here.
+  # The pattern captures the release number from the attribute name.
+  newest =
+    pattern: set:
+    let
+      number = name: lib.toIntBase10 (builtins.head (builtins.match pattern name));
+      names = lib.filter (name: builtins.match pattern name != null) (builtins.attrNames set);
+      byNewest = lib.sort (a: b: number a > number b) names;
+      stable = name: !lib.hasInfix "-" set.${name}.version; # Skips previews/RCs.
+    in
+    set.${lib.findFirst stable (throw "No stable ${pattern} package") byNewest};
 in
 {
   programs.git = {
@@ -41,7 +54,7 @@ in
     meson
     ccache
     python3
-    nodejs
+    nodejs_latest
     lua5_1
     luajitPackages.luarocks
     clang-tools
@@ -77,11 +90,11 @@ in
     bun
     deno
     # JVM, .NET, Ruby/PHP, Zig and BEAM: project versions still belong in devShells.
-    jdk25
+    (newest "jdk([0-9]+)" latest)
     maven
-    gradle_9
+    (newest "gradle_([0-9]+)" latest)
     kotlin
-    dotnet-sdk_10
+    (newest "sdk_([0-9]+)_0" latest.dotnetCorePackages)
     ruby
     bundler
     php

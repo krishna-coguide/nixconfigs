@@ -91,8 +91,8 @@ See [DESKTOP.md](DESKTOP.md) for the screenshot-led audit, functional coverage, 
 - **Rust:** rustc/Cargo/rustfmt/Clippy/rust-analyzer, nextest, cargo-audit/deny/expand/edit.
 - **Go:** Go, gopls, Delve, golangci-lint.
 - **Python:** Python, uv, Ruff, Pyright; existing Lua/LuaRocks prerequisites stay for Neovim.
-- **JS/TS:** Node, pnpm, TypeScript, Biome, Bun, Deno.
-- **Additional ecosystems:** OpenJDK 25, Maven, Gradle 9, Kotlin, .NET SDK 10, Ruby/Bundler, PHP/Composer, Zig/ZLS and Elixir/Erlang.
+- **JS/TS:** Node (newest release line), pnpm, TypeScript, Biome, Bun, Deno.
+- **Additional ecosystems:** the newest stable OpenJDK, Gradle and .NET SDK (25, 9 and 10 today), Maven, Kotlin, Ruby/Bundler, PHP/Composer, Zig/ZLS and Elixir/Erlang.
 - **Project/CI:** just, watchexec, hyperfine, tokei, ShellCheck, shfmt, yamllint, actionlint, pre-commit, dprint, StyLua, Taplo, Marksman, markdownlint, SQLFluff, Hadolint, ast-grep and ripgrep-all.
 - **Source control:** Git/LFS, gh, glab, LazyGit, delta, difftastic, Jujutsu, git-absorb/filter-repo. No guessed Git identity or account authentication.
 - **Nix:** direnv/nix-direnv, nix-output-monitor, nvd, nix-tree/diff, nixd, statix, deadnix, nixpkgs-review and the repo formatter.
