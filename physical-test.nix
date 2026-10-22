@@ -110,7 +110,7 @@ let
         && config.networking.firewall.trustedInterfaces == [ "lo" ]
         && config.services.avahi.enable
         && config.services.avahi.openFirewall
-        && !config.services.avahi.publish.enable
+        && config.services.avahi.settings.publish.disable-publishing
         && !config.services.avahi.nssmdns4
         && !config.services.avahi.nssmdns6;
       message = "Workstations need all-interface Miracast control, DHCP/DNS, negotiated UDP media and Avahi discovery, without trusting entire interfaces or changing host DNS.";
