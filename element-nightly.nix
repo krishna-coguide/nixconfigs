@@ -3,10 +3,10 @@
 { pkgs }:
 pkgs.stdenv.mkDerivation {
   pname = "element-nightly";
-  version = "2026101001";
+  version = "2026102201";
   src = pkgs.fetchurl {
-    url = "https://packages.element.io/debian/pool/main/e/element-nightly/element-nightly_2026101001_amd64.deb";
-    hash = "sha256-93DrV3PIMrJwECxvNBKPqbKlSMdZ6zsvjxbuRUOFGDo=";
+    url = "https://packages.element.io/debian/pool/main/e/element-nightly/element-nightly_2026102201_amd64.deb";
+    hash = "sha256-DYkWWp9gioIX/KC4G5rk3bd9B2E58ae1DZ1PghRhjkI=";
   };
   nativeBuildInputs = with pkgs; [
     dpkg
