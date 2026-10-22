@@ -1,7 +1,8 @@
--- Native Hyprland 0.55 configuration, deployed by Home Manager.
+-- Native Hyprland 0.56 configuration, deployed by Home Manager.
 -- @color@ tokens are rendered from colors.nix at build time.
 -- Services belong to UWSM/systemd, never a second exec-once process tree.
 local function rgb(hex) return "rgb(" .. hex:sub(2) .. ")" end
+local function rgba(hex, alpha) return "rgba(" .. hex:sub(2) .. alpha .. ")" end
 hl.monitor({ output = "", mode = "preferred", position = "auto", scale = "auto" })
 hl.config({
     general = {
@@ -12,11 +13,19 @@ hl.config({
             inactive_border = rgb("@border@"),
         },
     },
+    -- Frosted glass: the wallpaper shows through, blurred enough to keep
+    -- text readable. Kitty and media windows are overridden below.
     decoration = {
-        rounding = 6,
-        active_opacity = 1.0, inactive_opacity = 1.0,
-        shadow = { enabled = true, range = 16, render_power = 3, color = 0x55000000 },
-        blur = { enabled = false },
+        rounding = 10,
+        active_opacity = 0.96, inactive_opacity = 0.9, fullscreen_opacity = 1.0,
+        dim_special = 0.3,
+        shadow = { enabled = true, range = 20, render_power = 3, color = 0x66000000, color_inactive = 0x33000000 },
+        glow = { enabled = true, range = 12, render_power = 3, color = rgba("@accent@", "40"), color_inactive = 0x00000000 },
+        blur = {
+            enabled = true, size = 6, passes = 3,
+            noise = 0.02, contrast = 0.9, brightness = 0.85, vibrancy = 0.2,
+            popups = true, special = true,
+        },
     },
     animations = { enabled = true },
     dwindle = { preserve_split = true },
@@ -134,6 +143,15 @@ bind("XF86RFKill", app("desktop airplane"), "Network · Toggle airplane mode")
 bind("XF86Sleep", hl.dsp.exec_cmd("systemctl suspend"), "Session · Suspend")
 
 hl.window_rule({name = "dropterminal", match = {class = "^dropterminal$"}, workspace = "special:terminal", float = true, center = true})
+-- Kitty draws its own translucent background, so its text stays solid.
+hl.window_rule({ name = "terminal-opacity", match = { class = "^(kitty|dropterminal|files)$" }, opacity = "1.0 override 1.0 override" })
+-- Video, images, games, documents and VM screens keep their own pixels.
+hl.window_rule({ name = "opaque-content", match = { content = "^(photo|video|game)$" }, opacity = "1.0 override 1.0 override" })
+hl.window_rule({
+    name = "opaque-media",
+    match = { class = "^(mpv|umpv|imv|obs|com\\.obsproject\\.Studio|org\\.pwmt\\.zathura|\\.virt-manager-wrapped|org\\.gnome\\.NetworkDisplays|steam_app_[0-9]+)$" },
+    opacity = "1.0 override 1.0 override",
+})
 hl.window_rule({ name = "ignore-maximize", match = { class = ".*" }, suppress_event = "maximize" })
 hl.window_rule({
     name = "fix-xwayland-drag", match = { class = "^$", title = "^$", xwayland = true, float = true, fullscreen = false, pin = false },

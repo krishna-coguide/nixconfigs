@@ -427,7 +427,10 @@ in
       };
       settings = {
         window_padding_width = 10;
-        background_opacity = "1.0";
+        # Hyprland blurs the wallpaper behind the translucent background;
+        # Ctrl-Shift-A then M/L/1/D adjusts or resets it per window.
+        background_opacity = "0.85";
+        dynamic_background_opacity = true;
         hide_window_decorations = true;
         scrollback_lines = 20000;
         enable_audio_bell = false;
