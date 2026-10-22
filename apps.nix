@@ -16,9 +16,9 @@ let
   elementNightly = import ./element-nightly.nix { inherit pkgs; };
   tastytrade = import ./tastytrade.nix { inherit pkgs; };
   browserAddon = pkgs.fetchurl {
-    name = "keepassxc-browser-1.10.3.xpi";
-    url = "https://addons.mozilla.org/firefox/downloads/file/4831838/keepassxc_browser-1.10.3.xpi";
-    sha256 = "4df9c54e0a293aa2e37e9bcf97ec307a35a00e78cebaa9a68edba552c07c4568";
+    name = "keepassxc-browser-1.10.4.1.xpi";
+    url = "https://addons.mozilla.org/firefox/downloads/file/5078406/keepassxc_browser-1.10.4.1.xpi";
+    sha256 = "ae41157a3f017b0773abba2097d5b0056241631d0a38ad36d68d0b24b1a409c1";
   };
   keepassDefaults = (pkgs.formats.ini { }).generate "keepassxc-defaults.ini" {
     General = {
