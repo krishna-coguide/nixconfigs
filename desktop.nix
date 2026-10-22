@@ -229,7 +229,11 @@ in
       enable = true;
       systemd.enable = true;
       settings = {
-        log_level = "warn";
+        # Leave logs to the journal like every other session service.
+        logging = {
+          level = "warn";
+          target = "stderr";
+        };
         position = "Top";
         layer = "Top";
         modules = {
@@ -279,7 +283,7 @@ in
           }
         ];
         enable_esc_key = true;
-        media_player.max_title_length = 18;
+        media_player.max_text_length = 18;
         window_title = {
           mode = "Title";
           truncate_title_after_length = 26;
@@ -346,7 +350,8 @@ in
         appearance = {
           font_name = font;
           scale_factor = 1.15;
-          style = "Solid";
+          # Each module group is its own island over the wallpaper.
+          bar.surface = "transparent";
           opacity = 1.0;
           primary_color = {
             base = c.accent;
@@ -360,7 +365,6 @@ in
             weak = c.surface;
             strong = c.raised;
           };
-          secondary_color.base = c.surface;
           workspace_colors = [ c.accent ];
         };
       };
