@@ -13,6 +13,15 @@ let
     inherit (pkgs.stdenv.hostPlatform) system;
     config = pkgs.config;
   };
+  # nixpkgs' tauon uses __structuredAttrs, so its makeWrapperArgs reach the
+  # wrapper unexpanded (literal '$GI_TYPELIB_PATH', '$out') and GI typelibs
+  # such as Pango are not found. Expand them before wrapPythonPrograms runs.
+  tauon = latest.tauon.overrideAttrs (old: {
+    preFixup = (old.preFixup or "") + ''
+      makeWrapperArgs=("''${makeWrapperArgs[@]//'$GI_TYPELIB_PATH'/$GI_TYPELIB_PATH}")
+      makeWrapperArgs=("''${makeWrapperArgs[@]//'$out'/$out}")
+    '';
+  });
   elementNightly = import ./element-nightly.nix { inherit pkgs; };
   tastytrade = import ./tastytrade.nix { inherit pkgs; };
   browserAddon = pkgs.fetchurl {
@@ -122,7 +131,7 @@ in
       thunderbird
       file-roller
       imv
-      latest.tauon
+      tauon
       # Electron does not reliably detect a keyring under Hyprland. Use the
       # KeePassXC Secret Service explicitly; never fall back to basic_text.
       elementNightly
@@ -135,8 +144,8 @@ in
     ];
     # Fix the pinned package's stale launcher command, preserving its metadata.
     xdg.dataFile."applications/tauonmb.desktop".source = pkgs.runCommand "tauonmb.desktop" { } ''
-      substitute ${latest.tauon}/share/applications/tauonmb.desktop "$out" \
-        --replace-quiet 'Exec=tauonmb ' 'Exec=${lib.getExe latest.tauon} '
+      substitute ${tauon}/share/applications/tauonmb.desktop "$out" \
+        --replace-quiet 'Exec=tauonmb ' 'Exec=${lib.getExe tauon} '
     '';
     programs.mpv = {
       enable = true;
